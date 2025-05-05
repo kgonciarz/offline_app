@@ -1,0 +1,9 @@
+streamlit
+pandas
+sqlalchemy
+psycopg2-binary
+fpdf
+Pillow
+openpyxl
+supabase==1.0.3
+
