@@ -270,8 +270,6 @@ if delivery_file:
         weight_in_mt = weight_in_kg / 1000
         if weight_in_mt < 21:
             return "Too low"
-        elif weight_in_mt > 29:
-            return "Too high"
         else:
             return "Within range"
 
