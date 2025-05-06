@@ -26,8 +26,8 @@ def t(key):
             "Français": "✅ Format : .xlsx | Taille max : 200 Mo"
         },
         "title": {
-            "English": "☁️ CloudIA - Farmer Quota Verification System",
-            "Français": "☁️ CloudIA - Système de Vérification des Quotas"
+            "English": "☁️ CloudIA – Farmer Quota Verification System – Coop Level",
+            "Français": "☁️ CloudIA – Système de Vérification des Quotas – Niveau Coopérative"
         },
         "missing_exporter_column": {
             "English": "Missing 'exporter' column in the Excel file.",
