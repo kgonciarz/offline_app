@@ -80,7 +80,15 @@ def t(key):
         "lot_within_range": {
             "English": "Within range",
             "Français": "Dans la plage autorisée"
-        }
+        },
+         "insert_success": {
+            "English": "✅ Data successfully inserted! {0} new records added.",
+            "Français": "✅ Données insérées avec succès ! {0} nouveaux enregistrements ajoutés."
+        },
+
+
+
+        
     }
     return translations.get(key, {}).get(lang, key)
 
@@ -160,10 +168,10 @@ def save_delivery_to_supabase(df):
 
     try:
         supabase.table("traceability").insert(data).execute()
-        st.success(f"✅ Data successfully inserted! {len(data)} new records added.")
+        st.success(t("insert_success").format(len(data)))
         return True
     except Exception as e:
-        st.error(f"❌ Error while inserting into traceability table: {e}")
+        st.error(t("insert_error").format(e))
         return False
 def refresh_quota_view():
     try:
@@ -342,9 +350,9 @@ if delivery_file:
     def check_lot_status(weight_in_kg):
         weight_in_mt = weight_in_kg / 1000
         if weight_in_mt < 21:
-            return "Too low"
+            return t("lot_too_low")
         else:
-            return "Within range"
+            return t("lot_within_range")
 
     lot_status = lot_totals.apply(check_lot_status)
     lot_status_ok = lot_status == "Within range"
