@@ -7,7 +7,7 @@ from PIL import Image
 from supabase import create_client, Client
 import re
 import time
-
+st.set_page_config(page_title="CloudIA Quota Verifier", layout="centered")
 QUOTA_PER_HA = 800
 LOGO_PATH = "cloudia_logo.png"
 LOGO_COCOA = "cocoasourcelogo.jpg"
