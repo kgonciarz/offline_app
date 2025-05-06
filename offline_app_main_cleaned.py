@@ -12,6 +12,78 @@ QUOTA_PER_HA = 800
 LOGO_PATH = "cloudia_logo.png"
 LOGO_COCOA = "cocoasourcelogo.jpg"
 
+# --- Language Switcher ---
+lang = st.sidebar.radio("🌐 Language / Langue", ["English", "Français"])
+
+def t(key):
+    translations = {
+        "upload_title": {
+            "English": "Upload Delivery Template",
+            "Français": "Téléverser le Modèle de Livraison"
+        },
+        "file_format_caption": {
+            "English": "✅ Format: .xlsx | Max size: 200MB",
+            "Français": "✅ Format : .xlsx | Taille max : 200 Mo"
+        },
+        "title": {
+            "English": "☁️ CloudIA - Farmer Quota Verification System",
+            "Français": "☁️ CloudIA - Système de Vérification des Quotas"
+        },
+        "missing_exporter_column": {
+            "English": "Missing 'exporter' column in the Excel file.",
+            "Français": "La colonne 'exporter' est manquante dans le fichier Excel."
+        },
+        "missing_columns": {
+            "English": "Missing columns: {}",
+            "Français": "Colonnes manquantes : {}"
+        },
+        "unknown_farmers_error": {
+            "English": "The following farmers are NOT in the database:",
+            "Français": "Les producteurs suivants ne sont PAS dans la base de données :"
+        },
+        "quota_overview_title": {
+            "English": "### Quota Overview (Only Warnings and Exceeded)",
+            "Français": "### Aperçu des Quotas (Avertissements et Dépassements)"
+        },
+        "quota_warning_count": {
+            "English": "⚠️ {} farmers in the uploaded file have quota warnings or exceeded limits.",
+            "Français": "⚠️ {} producteurs ont des avertissements ou des dépassements de quota."
+        },
+        "quota_ok": {
+            "English": "✅ All farmers in the uploaded file are within their assigned quotas.",
+            "Français": "✅ Tous les producteurs respectent leurs quotas."
+        },
+        "lot_status_out_of_range": {
+            "English": "### Lot Status Overview - Out of Range",
+            "Français": "### Aperçu des Lots - Hors Plage Autorisée"
+        },
+        "rollback_error": {
+            "English": "❌ Uploaded delivery has been rolled back due to validation errors. PDF cannot be generated.",
+            "Français": "❌ Livraison annulée en raison d'erreurs de validation. PDF non généré."
+        },
+        "file_approved": {
+            "English": "✅ File approved. All farmers valid, quotas OK, and delivered kg per lot within allowed range.",
+            "Français": "✅ Fichier approuvé. Tous les producteurs sont valides et les quotas respectés."
+        },
+        "generate_pdf": {
+            "English": "Generate Approval PDF",
+            "Français": "Générer le PDF d'Approbation"
+        },
+        "download_pdf": {
+            "English": "Download Approval PDF",
+            "Français": "Télécharger le PDF"
+        },
+        "lot_too_low": {
+            "English": "Too low",
+            "Français": "Trop faible"
+        },
+        "lot_within_range": {
+            "English": "Within range",
+            "Français": "Dans la plage autorisée"
+        }
+    }
+    return translations.get(key, {}).get(lang, key)
+
 @st.cache_resource
 def get_supabase() -> Client:
     url = st.secrets["supabase"]["url"]
