@@ -239,10 +239,11 @@ with col1:
 with col2:
     st.image(Image.open(LOGO_COCOA), width=300)
 
-st.title("CloudIA - Farmer Quota Verification System")
+st.title(t("title"))
+
 
 # --- Główna logika ---
-delivery_file = st.sidebar.file_uploader("Upload Delivery Template", type=["xlsx"])
+delivery_file = st.sidebar.file_uploader(t("upload_title"), type=["xlsx"])
 farmers_df = load_all_farmers()
 
 if delivery_file:
@@ -251,7 +252,7 @@ if delivery_file:
     uploaded_df['farmer_id'] = uploaded_df['farmer_id'].astype(str).str.strip().str.lower()
 
     if 'exporter' not in uploaded_df.columns:
-        st.error("Missing 'exporter' column in the Excel file.")
+        st.error(t("missing_exporter_column"))
         st.stop()
 
     exporter_names = uploaded_df['exporter'].dropna().astype(str).str.strip().unique()
@@ -261,7 +262,7 @@ if delivery_file:
                         'certification', 'farmer_id', 'farm_id', 'net weight (kg)', 'exporter']
     missing_columns = [col for col in expected_columns if col not in uploaded_df.columns]
     if missing_columns:
-        st.error(f"Missing columns: {', '.join(missing_columns)}")
+        st.error(t("missing_columns").format(', '.join(missing_columns)))
         st.stop()
 
     uploaded_df.rename(columns={
@@ -280,7 +281,7 @@ if delivery_file:
     ]['farmer_id'].unique()
 
     if unknown_farmers.size > 0:
-        st.error("The following farmers are NOT in the database:")
+        st.error(t("unknown_farmers_error"))
         st.write(list(unknown_farmers))
         st.stop()
 
@@ -300,7 +301,7 @@ if delivery_file:
 
     # Diagnoza – sprawdź czy kolumna farmer_id istnieje
     if 'farmer_id' not in quota_df.columns:
-        st.error("❌ quota_view does not contain 'farmer_id'. Columns returned: " + str(list(quota_df.columns)))
+        st.error(t("missing_farmer_id_column").format(list(quota_df.columns)))
         st.stop()
 
     # Czyszczenie i filtrowanie
@@ -312,7 +313,7 @@ if delivery_file:
 
 
     if not quota_filtered.empty:
-        st.write("### Quota Overview (Only Warnings and Exceeded)")
+        st.write(t("quota_overview_title"))
 
         def highlight_status(val):
             if val == 'EXCEEDED':
@@ -330,9 +331,9 @@ if delivery_file:
         })
 
         st.dataframe(styled_quota, use_container_width=True)
-        st.warning(f"⚠️ {len(quota_filtered)} farmers in the uploaded file have quota warnings or exceeded limits.")
+        st.warning(t("quota_warning_count").format(len(quota_filtered)))
     else:
-        st.success("✅ All farmers in the uploaded file are within their assigned quotas.")
+        st.success(t("quota_ok"))
 
     all_ids_valid = len(unknown_farmers) == 0
     any_quota_exceeded = 'EXCEEDED' in quota_filtered['quota_status'].values
@@ -355,7 +356,7 @@ if delivery_file:
     })
 
     if not lot_status_ok.all():
-        st.write("### Lot Status Overview - Out of Range")
+        st.write(t("lot_status_out_of_range"))
         st.dataframe(lot_status_info[~lot_status_ok])
 
     def rollback_delivery(uploaded_df):
@@ -364,11 +365,11 @@ if delivery_file:
         for lot in lot_numbers:
             farmer_ids_for_lot = uploaded_df[uploaded_df['export_lot'] == lot]['farmer_id'].unique().tolist()
             delete_existing_delivery_rpc(lot, exporter_name, farmer_ids_for_lot)
-        st.error("❌ Uploaded delivery has been rolled back due to validation errors. PDF cannot be generated.")
+        st.error(t("rollback_error"))
 
     if all_ids_valid and not any_quota_exceeded and lot_status_ok.all():
-        st.success("✅ File approved. All farmers valid, quotas OK, and delivered kg per lot within allowed range.")
-        if st.button("Generate Approval PDF"):
+        st.success(t("file_approved"))
+        if st.button(t("generate_pdf")):
             total_kg = int(lot_totals.sum())
             pdf_file = generate_pdf_confirmation(
                 lot_numbers=lot_totals.index.tolist(),
@@ -380,6 +381,6 @@ if delivery_file:
                 logo_cocoa=LOGO_COCOA
             )
             with open(pdf_file, "rb") as f:
-                st.download_button("Download Approval PDF", data=f, file_name=pdf_file, mime="application/pdf")
+                st.download_button(t("download_pdf"), data=f, file_name=pdf_file, mime="application/pdf")
     else:
         rollback_delivery(uploaded_df)
