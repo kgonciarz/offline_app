@@ -259,7 +259,7 @@ st.markdown("""
         color: #2c3e50;
         letter-spacing: 5px;
     '>
-        EXPORT
+        COOP
     </div>
 """, unsafe_allow_html=True)
 
