@@ -241,13 +241,17 @@ def load_quota_view():
     return pd.DataFrame(result.data)
 
 # --- UI Layout ---
-col1, col2 = st.columns(2)
-with col1:
-    st.image(Image.open(LOGO_PATH), width=150)
-with col2:
-    st.image(Image.open(LOGO_COCOA), width=300)
+st.markdown("---")
+logo_col1, logo_col2 = st.columns([1, 1])
+with logo_col1:
+    st.image(Image.open(LOGO_PATH), width=120)
+with logo_col2:
+    st.image(Image.open(LOGO_COCOA), width=200)
 
-st.title(t("title"))
+
+st.markdown("<h1 style='text-align: center; font-size: 48px;'>EXPORT</h1>", unsafe_allow_html=True)
+st.markdown(f"### {t('title')}")
+
 
 
 # --- Główna logika ---
