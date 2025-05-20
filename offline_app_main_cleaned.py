@@ -249,7 +249,20 @@ with logo_col2:
     st.image(Image.open(LOGO_COCOA), width=200)
 
 
-st.markdown("<h1 style='text-align: center; font-size: 48px;'>EXPORT</h1>", unsafe_allow_html=True)
+st.markdown("""
+    <div style='
+        text-align: center;
+        font-size: 60px;
+        font-weight: bold;
+        margin-top: 30px;
+        margin-bottom: 20px;
+        color: #2c3e50;
+        letter-spacing: 5px;
+    '>
+        EXPORT
+    </div>
+""", unsafe_allow_html=True)
+
 st.markdown(f"### {t('title')}")
 
 
