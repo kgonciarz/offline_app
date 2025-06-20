@@ -7,6 +7,8 @@ from PIL import Image
 from supabase import create_client, Client
 import re
 import time
+from office365.sharepoint.client_context import ClientContext
+from office365.runtime.auth.client_credential import ClientCredential
 st.set_page_config(page_title="CloudIA Quota Verifier", layout="centered")
 QUOTA_PER_HA = 800
 LOGO_PATH = "cloudia_logo.png"
@@ -92,13 +94,23 @@ def t(key):
     }
     return translations.get(key, {}).get(lang, key)
 
-@st.cache_resource
-def get_supabase() -> Client:
-    url = st.secrets["supabase"]["url"]
-    key = st.secrets["supabase"]["key"]
-    return create_client(url, key)
+def upload_to_sharepoint(file_buffer, filename):
+    site_url = st.secrets["sharepoint"]["site_url"]
+    client_id = st.secrets["sharepoint"]["client_id"]
+    client_secret = st.secrets["sharepoint"]["client_secret"]
+    library_name = st.secrets["sharepoint"]["library_name"]
 
-supabase = get_supabase()
+    credentials = ClientCredential(client_id, client_secret)
+    ctx = ClientContext(site_url).with_credentials(credentials)
+
+    # Upload pliku do folderu głównego w bibliotece
+    target_folder = ctx.web.lists.get_by_title(library_name).root_folder
+    ctx.load(target_folder)
+    ctx.execute_query()
+
+    target_folder.upload_file(filename, file_buffer.getvalue()).execute_query()
+    st.success(f"✅ File uploaded to SharePoint: {filename}")
+
 
 @st.cache_data
 def load_all_farmers():
