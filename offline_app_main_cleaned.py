@@ -94,6 +94,7 @@ def t(key):
     }
     return translations.get(key, {}).get(lang, key)
 
+
 def upload_to_sharepoint(file_buffer, filename):
     site_url = st.secrets["sharepoint"]["site_url"]
     client_id = st.secrets["sharepoint"]["client_id"]
@@ -103,7 +104,6 @@ def upload_to_sharepoint(file_buffer, filename):
     credentials = ClientCredential(client_id, client_secret)
     ctx = ClientContext(site_url).with_credentials(credentials)
 
-    # Upload pliku do folderu głównego w bibliotece
     target_folder = ctx.web.lists.get_by_title(library_name).root_folder
     ctx.load(target_folder)
     ctx.execute_query()
@@ -111,6 +111,21 @@ def upload_to_sharepoint(file_buffer, filename):
     target_folder.upload_file(filename, file_buffer.getvalue()).execute_query()
     st.success(f"✅ File uploaded to SharePoint: {filename}")
 
+# --- UI ---
+st.title("📤 Upload Excel to SharePoint")
+
+uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
+
+if uploaded_file:
+    upload_to_sharepoint(uploaded_file, uploaded_file.name)
+
+@st.cache_resource
+def get_supabase() -> Client:
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    return create_client(url, key)
+
+supabase = get_supabase()
 
 @st.cache_data
 def load_all_farmers():
