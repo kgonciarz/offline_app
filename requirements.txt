@@ -6,4 +6,5 @@ fpdf
 Pillow
 openpyxl
 Office365-REST-Python-Client
+supabase
 
