@@ -94,24 +94,6 @@ def t(key):
     }
     return translations.get(key, {}).get(lang, key)
 
-def list_libraries():
-    site_url = st.secrets["sharepoint"]["site_url"]
-    client_id = st.secrets["sharepoint"]["client_id"]
-    client_secret = st.secrets["sharepoint"]["client_secret"]
-
-    credentials = ClientCredential(client_id, client_secret)
-    ctx = ClientContext(site_url).with_credentials(credentials)
-
-    st.write("📂 Lista dostępnych bibliotek dokumentów:")
-    libraries = ctx.web.lists
-    ctx.load(libraries)
-    ctx.execute_query()
-
-    for lib in libraries:
-        title = lib.properties["Title"]
-        st.write(f"➡️ {title}")
-
-st.title("🔍 Test bibliotek SharePoint")
 
 if st.button("🔄 Pokaż dostępne biblioteki"):
     list_libraries()
@@ -124,7 +106,7 @@ def upload_to_sharepoint(file_buffer, filename):
     credentials = ClientCredential(client_id, client_secret)
     ctx = ClientContext(site_url).with_credentials(credentials)
 
-    target_folder = ctx.web.lists.get_by_title(library_name).root_folder
+    target_folder = ctx.web.get_folder_by_server_relative_url("/sites/TRACAFILES/Shared Documents")
     ctx.load(target_folder)
     ctx.execute_query()
 
