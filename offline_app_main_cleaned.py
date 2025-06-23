@@ -93,43 +93,33 @@ def t(key):
         
     }
     return translations.get(key, {}).get(lang, key)
-def list_libraries():
-    site_url = st.secrets["sharepoint"]["site_url"]
-    client_id = st.secrets["sharepoint"]["client_id"]
-    client_secret = st.secrets["sharepoint"]["client_secret"]
 
-    credentials = ClientCredential(client_id, client_secret)
-    ctx = ClientContext(site_url).with_credentials(credentials)
-
-    lists = ctx.web.lists
-    ctx.load(lists)
-    ctx.execute_query()
-
-    st.write("📚 Lista bibliotek dokumentów w witrynie:")
-    for sp_list in lists:
-        if sp_list.properties.get("BaseTemplate") == 101:  # 101 = Document Library
-            st.write("➡️", sp_list.properties["Title"])
-
-if st.button("📂 Pokaż dostępne biblioteki"):
-    list_libraries()
 
 
 def upload_to_sharepoint(file_buffer, filename):
-    site_url = st.secrets["sharepoint"]["site_url"]
-    client_id = st.secrets["sharepoint"]["client_id"]
-    client_secret = st.secrets["sharepoint"]["client_secret"]
-    library_name = st.secrets["sharepoint"]["library_name"]
+    try:
+        site_url = st.secrets["sharepoint"]["site_url"]
+        client_id = st.secrets["sharepoint"]["client_id"]
+        client_secret = st.secrets["sharepoint"]["client_secret"]
+        library_name = st.secrets["sharepoint"]["library_name"]
 
-    credentials = ClientCredential(client_id, client_secret)
-    ctx = ClientContext(site_url).with_credentials(credentials)
+        credentials = ClientCredential(client_id, client_secret)
+        ctx = ClientContext(site_url).with_credentials(credentials)
 
-    target_folder = ctx.web.get_folder_by_server_relative_url(f"/sites/TRACAFILES/{library_name}")
-    ctx.load(target_folder)
-    ctx.execute_query()
+        # 👉 wypiszmy dokładnie co próbujemy otworzyć
+        folder_url = f"/sites/TRACAFILES/{library_name}"
+        st.write(f"📁 Trying to access: {folder_url}")
 
-    target_folder.upload_file(filename, file_buffer.getvalue()).execute_query()
+        target_folder = ctx.web.get_folder_by_server_relative_url(folder_url)
+        ctx.load(target_folder)
+        ctx.execute_query()
 
-    st.success(f"✅ File uploaded to SharePoint: {filename}")
+        target_folder.upload_file(filename, file_buffer.getvalue()).execute_query()
+        st.success(f"✅ File uploaded to SharePoint: {filename}")
+
+    except Exception as e:
+        st.error(f"❌ Upload failed. Error:\n\n{e}")
+
 
 # --- UI ---
 st.title("📤 Upload Excel to SharePoint")
