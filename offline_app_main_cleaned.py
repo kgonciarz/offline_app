@@ -93,7 +93,7 @@ def t(key):
         
     }
     return translations.get(key, {}).get(lang, key)
-def list_root_folders():
+def list_libraries():
     site_url = st.secrets["sharepoint"]["site_url"]
     client_id = st.secrets["sharepoint"]["client_id"]
     client_secret = st.secrets["sharepoint"]["client_secret"]
@@ -101,19 +101,17 @@ def list_root_folders():
     credentials = ClientCredential(client_id, client_secret)
     ctx = ClientContext(site_url).with_credentials(credentials)
 
-    root_folder = ctx.web.root_folder
-    ctx.load(root_folder)
+    lists = ctx.web.lists
+    ctx.load(lists)
     ctx.execute_query()
 
-    st.write("📁 Root folder URL:", root_folder.properties["ServerRelativeUrl"])
+    st.write("📚 Lista bibliotek dokumentów w witrynie:")
+    for sp_list in lists:
+        if sp_list.properties.get("BaseTemplate") == 101:  # 101 = Document Library
+            st.write("➡️", sp_list.properties["Title"])
 
-    folders = root_folder.folders
-    ctx.load(folders)
-    ctx.execute_query()
-
-    st.write("📂 Foldery w głównym katalogu SharePoint:")
-    for folder in folders:
-        st.write("➡️", folder.properties["Name"], "-", folder.properties["ServerRelativeUrl"])
+if st.button("📂 Pokaż dostępne biblioteki"):
+    list_libraries()
 
 
 def upload_to_sharepoint(file_buffer, filename):
