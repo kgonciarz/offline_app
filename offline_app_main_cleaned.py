@@ -123,11 +123,12 @@ def upload_to_sharepoint(file_buffer, filename):
     credentials = ClientCredential(client_id, client_secret)
     ctx = ClientContext(site_url).with_credentials(credentials)
 
-    target_folder = ctx.web.get_folder_by_server_relative_url("/sites/TRACAFILES/Shared Documents")
+    target_folder = ctx.web.get_folder_by_server_relative_url("/sites/TRACAFILES/Shared Documents/Forms")
     ctx.load(target_folder)
     ctx.execute_query()
 
     target_folder.upload_file(filename, file_buffer.getvalue()).execute_query()
+
     st.success(f"✅ File uploaded to SharePoint: {filename}")
 
 # --- UI ---
