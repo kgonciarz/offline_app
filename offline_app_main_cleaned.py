@@ -123,7 +123,7 @@ def upload_to_sharepoint(file_buffer, filename):
     credentials = ClientCredential(client_id, client_secret)
     ctx = ClientContext(site_url).with_credentials(credentials)
 
-    target_folder = ctx.web.get_folder_by_server_relative_url("/sites/TRACAFILES/Shared Documents")
+    target_folder = ctx.web.get_folder_by_server_relative_url(f"/sites/TRACAFILES/Shared Documents")
     ctx.load(target_folder)
     ctx.execute_query()
 
