@@ -237,6 +237,9 @@ def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg
 
 
 def upload_to_sharepoint(file_buffer, filename):
+    delivery_file.seek(0)  # resetujemy pointer pliku Excel
+    upload_to_sharepoint(delivery_file, delivery_file.name)
+
     try:
         site_url = st.secrets["sharepoint"]["site_url"]
         client_id = st.secrets["sharepoint"]["client_id"]
@@ -452,13 +455,17 @@ if delivery_file:
 
     with col2:
         if st.button("📤 Upload to SharePoint"):
-            if st.session_state.get("pdf_buffer") and st.session_state.get("pdf_filename"):
-                st.write("🔐 DEBUG sharepoint:", dict(st.secrets.get("sharepoint", {})))
+            if st.session_state['pdf_buffer'] and st.session_state['pdf_filename']:
+                st.info("📤 Uploading PDF to SharePoint...")
                 upload_to_sharepoint(
-                    st.session_state["pdf_buffer"],
-                    st.session_state["pdf_filename"]
+                    st.session_state['pdf_buffer'],
+                    st.session_state['pdf_filename']
                 )
+
+                st.info("📤 Uploading Excel to SharePoint...")
+                delivery_file.seek(0)  # reset file pointer!
+                upload_to_sharepoint(delivery_file, delivery_file.name)
+
+                st.success("✅ Both PDF and Excel uploaded to SharePoint.")
             else:
                 st.warning("⚠️ Please generate the PDF first.")
-
-
