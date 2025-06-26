@@ -250,9 +250,9 @@ def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg
 
     # Zamiast zapisu na dysk → PDF do RAM
     pdf_buffer = BytesIO()
-    pdf_output_str = pdf.output(dest='S').encode('latin-1')
-    pdf_buffer.write(pdf_output_str)
+    pdf.output(pdf_buffer)  # <--- tak!
     pdf_buffer.seek(0)
+
 
     return filename, pdf_buffer
 
