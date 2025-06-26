@@ -452,17 +452,26 @@ if delivery_file:
 
     with col2:
         if st.button("📤 Upload to SharePoint"):
+            success_pdf = success_excel = False
+
             if st.session_state['pdf_buffer'] and st.session_state['pdf_filename']:
                 st.info("📤 Uploading PDF to SharePoint...")
-                upload_to_sharepoint(
+                success_pdf = upload_to_sharepoint(
                     st.session_state['pdf_buffer'],
                     st.session_state['pdf_filename']
                 )
 
                 st.info("📤 Uploading Excel to SharePoint...")
-                delivery_file.seek(0)  # reset file pointer!
-                upload_to_sharepoint(delivery_file, delivery_file.name)
+                delivery_file.seek(0)
+                success_excel = upload_to_sharepoint(
+                    delivery_file,
+                    delivery_file.name
+                )
 
-                st.success("✅ Both PDF and Excel uploaded to SharePoint.")
+                if success_pdf and success_excel:
+                    st.success("✅ Both PDF and Excel uploaded to SharePoint.")
+                else:
+                    st.warning("⚠️ Not all files uploaded. See error above.")
             else:
                 st.warning("⚠️ Please generate the PDF first.")
+
