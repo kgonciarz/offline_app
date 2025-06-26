@@ -228,12 +228,13 @@ def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg
     total_volume_mt = round(total_kg / 1000, 2)
     filename = f"Approval_{reference_number}_{today_str}_{exporter_clean}_{total_volume_mt}MT.pdf"
 
-    # Do pamięci
-    pdf_buffer = BytesIO()
-    pdf.output(pdf_buffer)  # ZAPIS DO RAMU
+    # 🧠 Prawidłowy zapis do BytesIO:
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    pdf_buffer = BytesIO(pdf_bytes)
     pdf_buffer.seek(0)
 
     return filename, pdf_buffer
+
 
 def upload_to_sharepoint(file_buffer, filename):
     try:
