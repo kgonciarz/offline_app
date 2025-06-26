@@ -95,6 +95,7 @@ def t(key):
     }
     return translations.get(key, {}).get(lang, key)
 
+sharepoint_config = st.secrets.get("sharepoint", {})
 
 @st.cache_resource
 def get_supabase() -> Client:
@@ -236,12 +237,12 @@ def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg
     return filename, pdf_buffer
 
 
-def upload_to_sharepoint(file_buffer, filename):
+def upload_to_sharepoint(file_buffer, filename, sharepoint_config):
     try:
-        site_url = st.secrets["sharepoint"]["site_url"]
-        client_id = st.secrets["sharepoint"]["client_id"]
-        client_secret = st.secrets["sharepoint"]["client_secret"]
-        library_name = st.secrets["sharepoint"]["library_name"]
+        site_url = sharepoint_config["site_url"]
+        client_id = sharepoint_config["client_id"]
+        client_secret = sharepoint_config["client_secret"]
+        library_name = sharepoint_config["library_name"]
 
         credentials = ClientCredential(client_id, client_secret)
         ctx = ClientContext(site_url).with_credentials(credentials)
@@ -258,6 +259,7 @@ def upload_to_sharepoint(file_buffer, filename):
     except Exception as e:
         st.error(f"❌ Upload failed. Error:\n\n{e}")
         return False
+
 
 
 def load_quota_view():
