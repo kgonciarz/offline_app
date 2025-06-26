@@ -453,14 +453,22 @@ if delivery_file:
     with col2:
         if st.button("📤 Upload to SharePoint"):
             if st.session_state['pdf_buffer'] and st.session_state['pdf_filename']:
-            # --- Upload PDF ---
-                upload_to_sharepoint(st.session_state['pdf_buffer'], st.session_state['pdf_filename'])
+                try:
+                    st.info("📄 Uploading PDF to SharePoint...")
+                    upload_to_sharepoint(st.session_state['pdf_buffer'], st.session_state['pdf_filename'])
+                except Exception as e:
+                    t.error(f"❌ PDF upload failed: {e}")
 
-            # --- Upload Excel ---
-                delivery_file.seek(0)  # reset pointer
-                upload_to_sharepoint(delivery_file, delivery_file.name)
+                try:
+                    st.info("📊 Uploading Excel to SharePoint...")
+                    delivery_file.seek(0)  # Reset pointer!
+                
+                    excel_filename = f"Delivery_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                    upload_to_sharepoint(delivery_file, excel_filename)
+                except Exception as e:
+                    st.error(f"❌ Excel upload failed: {e}")
 
-                st.success("✅ PDF and Excel uploaded to SharePoint.")
+                st.success("✅ Both PDF and Excel uploaded to SharePoint.")
             else:
                 st.warning("⚠️ Please generate the PDF first.")
 
