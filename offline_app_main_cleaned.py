@@ -460,14 +460,16 @@ if delivery_file:
                 st.info("📤 Uploading PDF to SharePoint...")
                 success_pdf = upload_to_sharepoint(
                     st.session_state['pdf_buffer'],
-                    st.session_state['pdf_filename']
+                    st.session_state['pdf_filename'],
+                    sharepoint_config  # ✅ dodane!
                 )
 
                 st.info("📤 Uploading Excel to SharePoint...")
                 delivery_file.seek(0)
                 success_excel = upload_to_sharepoint(
                     delivery_file,
-                    delivery_file.name
+                    delivery_file.name,
+                    sharepoint_config  # ✅ dodane!
                 )
 
                 if success_pdf and success_excel:
@@ -476,4 +478,5 @@ if delivery_file:
                     st.warning("⚠️ Not all files uploaded. See error above.")
             else:
                 st.warning("⚠️ Please generate the PDF first.")
+
 
