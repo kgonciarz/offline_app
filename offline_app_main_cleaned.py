@@ -425,7 +425,7 @@ if delivery_file:
         st.error(t("rollback_error"))
 
     if all_ids_valid and not any_quota_exceeded and lot_status_ok.all():
-    st.success(t("file_approved"))
+        st.success(t("file_approved"))
 
     col1, col2 = st.columns([1, 1])
 
