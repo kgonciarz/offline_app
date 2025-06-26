@@ -213,6 +213,9 @@ def upload_to_sharepoint(file_buffer, filename):
 
 
 def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg, lot_kg_summary, logo_path, logo_cocoa):
+    from fpdf import FPDF
+    from io import BytesIO
+
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 14)
@@ -242,19 +245,20 @@ def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg
     pdf.ln(5)
     pdf.cell(0, 10, "Approved by CloudIA", ln=True)
 
+    # Nazwa pliku
     reference_number = lot_numbers[0] if len(lot_numbers) == 1 else "MULTI"
     today_str = datetime.now().strftime('%Y%m%d')
     exporter_clean = exporter_name.replace(" ", "_").replace("/", "_")[:20]
     total_volume_mt = round(total_kg / 1000, 2)
     filename = f"Approval_{reference_number}_{today_str}_{exporter_clean}_{total_volume_mt}MT.pdf"
 
-    # Zamiast zapisu na dysk → PDF do RAM
+    # Do pamięci
     pdf_buffer = BytesIO()
-    pdf.output(pdf_buffer)  # <--- tak!
+    pdf.output(pdf_buffer)  # ZAPIS DO RAMU
     pdf_buffer.seek(0)
 
-
     return filename, pdf_buffer
+
 
 
 def load_quota_view():
@@ -449,7 +453,11 @@ if delivery_file:
 
     with col2:
         if st.button("📤 Upload to SharePoint"):
-            if st.session_state['pdf_buffer'] and st.session_state['pdf_filename']:
-                upload_to_sharepoint(st.session_state['pdf_buffer'], st.session_state['pdf_filename'])
+            if st.session_state.get("pdf_buffer") and st.session_state.get("pdf_filename"):
+                upload_to_sharepoint(
+                    st.session_state["pdf_buffer"],
+                    st.session_state["pdf_filename"]
+                )
             else:
                 st.warning("⚠️ Please generate the PDF first.")
+
