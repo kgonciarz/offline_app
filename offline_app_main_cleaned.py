@@ -237,9 +237,6 @@ def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg
 
 
 def upload_to_sharepoint(file_buffer, filename):
-    delivery_file.seek(0)  # resetujemy pointer pliku Excel
-    upload_to_sharepoint(delivery_file, delivery_file.name)
-
     try:
         site_url = st.secrets["sharepoint"]["site_url"]
         client_id = st.secrets["sharepoint"]["client_id"]
