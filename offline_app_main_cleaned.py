@@ -305,7 +305,8 @@ st.markdown(f"### {t('title')}")
 
 
 # --- Główna logika ---
-delivery_file = st.sidebar.file_uploader(t("upload_title"), type=["xlsx"])
+st.subheader("📥 Step 1: Upload Excel for Validation")
+delivery_file = st.file_uploader(t("upload_title"), type=["xlsx"])
 farmers_df = load_all_farmers()
 
 if delivery_file:
@@ -446,3 +447,9 @@ if delivery_file:
                 st.download_button(t("download_pdf"), data=f, file_name=pdf_file, mime="application/pdf")
     else:
         rollback_delivery(uploaded_df)
+    with st.expander("📤 Step 2: Upload to SharePoint", expanded=True):
+        st.info("Everything looks good. You can now upload the file to SharePoint.")
+        if st.button("Upload to SharePoint"):
+            delivery_file.seek(0)  # reset pozycji pliku
+            upload_to_sharepoint(delivery_file, delivery_file.name)
+       
