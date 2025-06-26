@@ -425,24 +425,24 @@ if delivery_file:
     if all_ids_valid and not any_quota_exceeded and lot_status_ok.all():
         st.success(t("file_approved"))
 
-    col1, col2 = st.columns([1, 1])
+        col1, col2 = st.columns([1, 1])
 
-    with col1:
-        if st.button(t("generate_pdf")):
-            total_kg = int(lot_totals.sum())
-            pdf_file = generate_pdf_confirmation(
-                lot_numbers=lot_totals.index.tolist(),
-                exporter_name=exporter_name,
-                farmer_count=uploaded_df['farmer_id'].nunique(),
-                total_kg=total_kg,
-                lot_kg_summary=lot_totals.to_dict(),
-                logo_path=LOGO_PATH,
-                logo_cocoa=LOGO_COCOA
-            )
-            with open(pdf_file, "rb") as f:
-                st.download_button(t("download_pdf"), data=f, file_name=pdf_file, mime="application/pdf")
+        with col1:
+            if st.button(t("generate_pdf")):
+                total_kg = int(lot_totals.sum())
+                pdf_file = generate_pdf_confirmation(
+                    lot_numbers=lot_totals.index.tolist(),
+                    exporter_name=exporter_name,
+                    farmer_count=uploaded_df['farmer_id'].nunique(),
+                    total_kg=total_kg,
+                    lot_kg_summary=lot_totals.to_dict(),
+                    logo_path=LOGO_PATH,
+                    logo_cocoa=LOGO_COCOA
+                )
+                with open(pdf_file, "rb") as f:
+                    st.download_button(t("download_pdf"), data=f, file_name=pdf_file, mime="application/pdf")
 
-    with col2:
-        if st.button("📤 Upload to SharePoint"):
-            delivery_file.seek(0)
-            upload_to_sharepoint(delivery_file, delivery_file.name)
+        with col2:
+            if st.button("📤 Upload to SharePoint"):
+                delivery_file.seek(0)
+                upload_to_sharepoint(delivery_file, delivery_file.name)
