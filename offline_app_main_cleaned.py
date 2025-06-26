@@ -425,7 +425,11 @@ if delivery_file:
         st.error(t("rollback_error"))
 
     if all_ids_valid and not any_quota_exceeded and lot_status_ok.all():
-        st.success(t("file_approved"))
+    st.success(t("file_approved"))
+
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
         if st.button(t("generate_pdf")):
             total_kg = int(lot_totals.sum())
             pdf_file = generate_pdf_confirmation(
@@ -439,15 +443,8 @@ if delivery_file:
             )
             with open(pdf_file, "rb") as f:
                 st.download_button(t("download_pdf"), data=f, file_name=pdf_file, mime="application/pdf")
-    else:
-        rollback_delivery(uploaded_df)
 
-# --- UI ---
-    with st.expander("📤 Step 2: Upload to SharePoint", expanded=True):
-        st.info("Everything looks good. You can now upload the file to SharePoint.")
-        if st.button("Upload to SharePoint"):
-            delivery_file.seek(0)  # reset pozycji pliku
+    with col2:
+        if st.button("📤 Upload to SharePoint"):
+            delivery_file.seek(0)
             upload_to_sharepoint(delivery_file, delivery_file.name)
-st.title("📤 Upload Excel to SharePoint")
-
-uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])     
