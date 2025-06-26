@@ -444,7 +444,7 @@ if delivery_file:
             with open(pdf_file, "rb") as f:
                 st.download_button(t("download_pdf"), data=f, file_name=pdf_file, mime="application/pdf")
 
-    with col2:
-        if st.button("📤 Upload to SharePoint"):
-            delivery_file.seek(0)
-            upload_to_sharepoint(delivery_file, delivery_file.name)
+            with col2:
+                if st.button("📤 Upload to SharePoint"):
+                    delivery_file.seek(0)
+                    upload_to_sharepoint(delivery_file, delivery_file.name)
