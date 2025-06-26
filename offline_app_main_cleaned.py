@@ -222,7 +222,7 @@ def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg
     pdf.cell(0, 10, "Approved by CloudIA", ln=True)
 
     # Nazwa pliku
-    reference_number = lot_numbers[0] if len(lot_numbers) == 1 else "MULTI"
+    reference_number = str(lot_numbers[0]).replace("/", "_") if len(lot_numbers) == 1 else "MULTI"
     today_str = datetime.now().strftime('%Y%m%d')
     exporter_clean = exporter_name.replace(" ", "_").replace("/", "_")[:20]
     total_volume_mt = round(total_kg / 1000, 2)
