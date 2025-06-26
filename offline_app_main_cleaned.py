@@ -452,12 +452,16 @@ if delivery_file:
 
     with col2:
         if st.button("📤 Upload to SharePoint"):
-            if st.session_state.get("pdf_buffer") and st.session_state.get("pdf_filename"):
-                st.write("🔐 DEBUG sharepoint:", dict(st.secrets.get("sharepoint", {})))
-                upload_to_sharepoint(
-                    st.session_state["pdf_buffer"],
-                    st.session_state["pdf_filename"]
-                )
+            if st.session_state['pdf_buffer'] and st.session_state['pdf_filename']:
+            # --- Upload PDF ---
+                upload_to_sharepoint(st.session_state['pdf_buffer'], st.session_state['pdf_filename'])
+
+            # --- Upload Excel ---
+                delivery_file.seek(0)  # reset pointer
+                upload_to_sharepoint(delivery_file, delivery_file.name)
+
+                st.success("✅ PDF and Excel uploaded to SharePoint.")
             else:
                 st.warning("⚠️ Please generate the PDF first.")
+
 
