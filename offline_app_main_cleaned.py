@@ -453,6 +453,7 @@ if delivery_file:
     with col2:
         if st.button("📤 Upload to SharePoint"):
             if st.session_state.get("pdf_buffer") and st.session_state.get("pdf_filename"):
+                st.write("🔐 DEBUG sharepoint:", dict(st.secrets.get("sharepoint", {})))
                 upload_to_sharepoint(
                     st.session_state["pdf_buffer"],
                     st.session_state["pdf_filename"]
