@@ -417,6 +417,10 @@ if delivery_file:
     if all_ids_valid and not any_quota_exceeded and lot_status_ok.all():
         st.success(t("file_approved"))
 
+    if 'pdf_buffer' not in st.session_state:
+        st.session_state['pdf_buffer'] = None
+        st.session_state['pdf_filename'] = None
+
         col1, col2 = st.columns([1, 1])
 
         with col1:
@@ -426,11 +430,13 @@ if delivery_file:
                     lot_numbers=lot_totals.index.tolist(),
                     exporter_name=exporter_name,
                     farmer_count=uploaded_df['farmer_id'].nunique(),
-                    total_kg=int(lot_totals.sum()),
+                    total_kg=total_kg,
                     lot_kg_summary=lot_totals.to_dict(),
                     logo_path=LOGO_PATH,
                     logo_cocoa=LOGO_COCOA
-                )   
+                )
+                st.session_state['pdf_buffer'] = pdf_buffer
+                st.session_state['pdf_filename'] = filename
 
                 st.download_button(
                     label=t("download_pdf"),
@@ -440,7 +446,10 @@ if delivery_file:
                 )
 
 
+
         with col2:
             if st.button("📤 Upload to SharePoint"):
-                delivery_file.seek(0)
-                upload_to_sharepoint(delivery_file, delivery_file.name)
+                if st.session_state['pdf_buffer'] and st.session_state['pdf_filename']:
+                    upload_to_sharepoint(st.session_state['pdf_buffer'], st.session_state['pdf_filename'])
+                else:
+                    st.warning("⚠️ Please generate the PDF first.")
