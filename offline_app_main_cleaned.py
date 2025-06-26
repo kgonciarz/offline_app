@@ -246,24 +246,14 @@ def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg
     today_str = datetime.now().strftime('%Y%m%d')
     exporter_clean = exporter_name.replace(" ", "_").replace("/", "_")[:20]
     total_volume_mt = round(total_kg / 1000, 2)
-
     filename = f"Approval_{reference_number}_{today_str}_{exporter_clean}_{total_volume_mt}MT.pdf"
-    pdf.output(filename)
 
-    # --- ZAPISZ DO TABELI approvals ---
-    data = {
-        "created_at": now,
-        "lot_number": ", ".join(str(l) for l in lot_numbers),
-        "exporter_name": exporter_name,
-        "approved_by": "CloudIA",
-        "file_name": filename
-    }
-    try:
-        supabase.table("approvals").insert(data).execute()
-    except Exception as e:
-        st.error(f"❌ Error saving approval to DB: {e}")
+    # Zamiast zapisu na dysk → PDF do RAM
+    pdf_buffer = BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)
 
-    return filename
+    return filename, pdf_buffer
 
 
 def load_quota_view():
@@ -431,17 +421,23 @@ if delivery_file:
         with col1:
             if st.button(t("generate_pdf")):
                 total_kg = int(lot_totals.sum())
-                pdf_file = generate_pdf_confirmation(
-                    lot_numbers=lot_totals.index.tolist(),
-                    exporter_name=exporter_name,
-                    farmer_count=uploaded_df['farmer_id'].nunique(),
-                    total_kg=total_kg,
-                    lot_kg_summary=lot_totals.to_dict(),
-                    logo_path=LOGO_PATH,
-                    logo_cocoa=LOGO_COCOA
-                )
-                with open(pdf_file, "rb") as f:
-                    st.download_button(t("download_pdf"), data=f, file_name=pdf_file, mime="application/pdf")
+                filename, pdf_buffer = generate_pdf_confirmation(
+                lot_numbers=lot_totals.index.tolist(),
+                exporter_name=exporter_name,
+                farmer_count=uploaded_df['farmer_id'].nunique(),
+                total_kg=int(lot_totals.sum()),
+                lot_kg_summary=lot_totals.to_dict(),
+                logo_path=LOGO_PATH,
+                logo_cocoa=LOGO_COCOA
+            )
+
+            st.download_button(
+                label=t("download_pdf"),
+                data=pdf_buffer,
+                file_name=filename,
+                mime="application/pdf"
+            )
+
 
         with col2:
             if st.button("📤 Upload to SharePoint"):
