@@ -9,6 +9,8 @@ import re
 import time
 from office365.sharepoint.client_context import ClientContext
 from office365.runtime.auth.client_credential import ClientCredential
+uploaded_file = None  # zapobiega crashowi w razie przypadkowego użycia
+
 st.set_page_config(page_title="CloudIA Quota Verifier", layout="centered")
 QUOTA_PER_HA = 800
 LOGO_PATH = "cloudia_logo.png"
