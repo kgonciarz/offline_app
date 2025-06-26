@@ -95,14 +95,6 @@ def t(key):
     return translations.get(key, {}).get(lang, key)
 
 
-# --- UI ---
-st.title("📤 Upload Excel to SharePoint")
-
-uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
-
-if uploaded_file:
-    upload_to_sharepoint(uploaded_file, uploaded_file.name)
-
 @st.cache_resource
 def get_supabase() -> Client:
     url = st.secrets["supabase"]["url"]
@@ -217,7 +209,15 @@ def upload_to_sharepoint(file_buffer, filename):
 
     except Exception as e:
         st.error(f"❌ Upload failed. Error:\n\n{e}")
-        
+
+# --- UI ---
+st.title("📤 Upload Excel to SharePoint")
+
+uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
+
+if uploaded_file:
+    upload_to_sharepoint(uploaded_file, uploaded_file.name)
+
 def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg, lot_kg_summary, logo_path, logo_cocoa):
     pdf = FPDF()
     pdf.add_page()
