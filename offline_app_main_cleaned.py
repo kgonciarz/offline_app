@@ -187,30 +187,6 @@ def refresh_quota_view():
 refresh_quota_view()
 
 
-def upload_to_sharepoint(file_buffer, filename):
-    try:
-        site_url = st.secrets["sharepoint"]["site_url"]
-        client_id = st.secrets["sharepoint"]["client_id"]
-        client_secret = st.secrets["sharepoint"]["client_secret"]
-        library_name = st.secrets["sharepoint"]["library_name"]
-
-        credentials = ClientCredential(client_id, client_secret)
-        ctx = ClientContext(site_url).with_credentials(credentials)
-
-        # 👉 wypiszmy dokładnie co próbujemy otworzyć
-        folder_url = f"/sites/TRACAFILES/{library_name}"
-        st.write(f"📁 Trying to access: {folder_url}")
-
-        target_folder = ctx.web.get_folder_by_server_relative_url(folder_url)
-        ctx.load(target_folder)
-        ctx.execute_query()
-
-        target_folder.upload_file(filename, file_buffer.getvalue()).execute_query()
-        st.success(f"✅ File uploaded to SharePoint: {filename}")
-
-    except Exception as e:
-        st.error(f"❌ Upload failed. Error:\n\n{e}")
-
 
 def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg, lot_kg_summary, logo_path, logo_cocoa):
     from fpdf import FPDF
@@ -259,7 +235,29 @@ def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg
 
     return filename, pdf_buffer
 
+def upload_to_sharepoint(file_buffer, filename):
+    try:
+        site_url = st.secrets["sharepoint"]["site_url"]
+        client_id = st.secrets["sharepoint"]["client_id"]
+        client_secret = st.secrets["sharepoint"]["client_secret"]
+        library_name = st.secrets["sharepoint"]["library_name"]
 
+        credentials = ClientCredential(client_id, client_secret)
+        ctx = ClientContext(site_url).with_credentials(credentials)
+
+        # 👉 wypiszmy dokładnie co próbujemy otworzyć
+        folder_url = f"/sites/TRACAFILES/{library_name}"
+        st.write(f"📁 Trying to access: {folder_url}")
+
+        target_folder = ctx.web.get_folder_by_server_relative_url(folder_url)
+        ctx.load(target_folder)
+        ctx.execute_query()
+
+        target_folder.upload_file(filename, file_buffer.getvalue()).execute_query()
+        st.success(f"✅ File uploaded to SharePoint: {filename}")
+
+    except Exception as e:
+        st.error(f"❌ Upload failed. Error:\n\n{e}")
 
 def load_quota_view():
     result = supabase.table("quota_view").select("*").execute()
