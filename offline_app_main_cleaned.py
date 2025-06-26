@@ -443,12 +443,11 @@ if delivery_file:
         rollback_delivery(uploaded_df)
 
 # --- UI ---
+    with st.expander("📤 Step 2: Upload to SharePoint", expanded=True):
+        st.info("Everything looks good. You can now upload the file to SharePoint.")
+        if st.button("Upload to SharePoint"):
+            delivery_file.seek(0)  # reset pozycji pliku
+            upload_to_sharepoint(delivery_file, delivery_file.name)
 st.title("📤 Upload Excel to SharePoint")
 
-uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
-with st.expander("📤 Step 2: Upload to SharePoint", expanded=True):
-    st.info("Everything looks good. You can now upload the file to SharePoint.")
-    if st.button("Upload to SharePoint"):
-        delivery_file.seek(0)  # reset pozycji pliku
-        upload_to_sharepoint(delivery_file, delivery_file.name)
-       
+uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])     
