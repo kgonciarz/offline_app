@@ -421,35 +421,35 @@ if delivery_file:
         st.session_state['pdf_buffer'] = None
         st.session_state['pdf_filename'] = None
 
-        col1, col2 = st.columns([1, 1])
+    col1, col2 = st.columns([1, 1])
 
-        with col1:
-            if st.button(t("generate_pdf")):
-                total_kg = int(lot_totals.sum())
-                filename, pdf_buffer = generate_pdf_confirmation(
-                    lot_numbers=lot_totals.index.tolist(),
-                    exporter_name=exporter_name,
-                    farmer_count=uploaded_df['farmer_id'].nunique(),
-                    total_kg=total_kg,
-                    lot_kg_summary=lot_totals.to_dict(),
-                    logo_path=LOGO_PATH,
-                    logo_cocoa=LOGO_COCOA
-                )
-                st.session_state['pdf_buffer'] = pdf_buffer
-                st.session_state['pdf_filename'] = filename
+    with col1:
+        if st.button(t("generate_pdf")):
+            total_kg = int(lot_totals.sum())
+            filename, pdf_buffer = generate_pdf_confirmation(
+                lot_numbers=lot_totals.index.tolist(),
+                exporter_name=exporter_name,
+                farmer_count=uploaded_df['farmer_id'].nunique(),
+                total_kg=total_kg,
+                lot_kg_summary=lot_totals.to_dict(),
+                logo_path=LOGO_PATH,
+                logo_cocoa=LOGO_COCOA
+            )
+            st.session_state['pdf_buffer'] = pdf_buffer
+            st.session_state['pdf_filename'] = filename
 
-                st.download_button(
-                    label=t("download_pdf"),
-                    data=pdf_buffer,
-                    file_name=filename,
-                    mime="application/pdf"
-                )
+            st.download_button(
+                label=t("download_pdf"),
+                data=pdf_buffer,
+                file_name=filename,
+                mime="application/pdf"
+            )
 
 
 
-        with col2:
-            if st.button("📤 Upload to SharePoint"):
-                if st.session_state['pdf_buffer'] and st.session_state['pdf_filename']:
-                    upload_to_sharepoint(st.session_state['pdf_buffer'], st.session_state['pdf_filename'])
-                else:
-                    st.warning("⚠️ Please generate the PDF first.")
+    with col2:
+        if st.button("📤 Upload to SharePoint"):
+            if st.session_state['pdf_buffer'] and st.session_state['pdf_filename']:
+                upload_to_sharepoint(st.session_state['pdf_buffer'], st.session_state['pdf_filename'])
+            else:
+                st.warning("⚠️ Please generate the PDF first.")
