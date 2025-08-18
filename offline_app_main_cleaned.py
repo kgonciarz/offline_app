@@ -264,7 +264,27 @@ def upload_to_sharepoint(file_buffer, filename, sharepoint_config):
 
 def load_quota_view():
     result = supabase.table("quota_view").select("*").execute()
-    return pd.DataFrame(result.data)
+    df = pd.DataFrame(result.data)
+
+    if not df.empty:
+        # normalize headers to lowercase + strip
+        df.columns = df.columns.str.strip().str.lower()
+
+        # tolerate common variants → all lowercase keys
+        if 'farmer_id' not in df.columns:
+            alias_map = {
+                'farmerid': 'farmer_id',
+                'farmer-id': 'farmer_id',
+                'farmer_id_': 'farmer_id',
+                'id_farmer': 'farmer_id',
+                'idfarmer': 'farmer_id',
+            }
+            for k, v in alias_map.items():
+                if k in df.columns:
+                    df = df.rename(columns={k: v})
+                    break
+    return df
+
 
 # --- UI Layout ---
 st.markdown("---")
@@ -399,7 +419,8 @@ if delivery_file:
             return t("lot_within_range")
 
     lot_status = lot_totals.apply(check_lot_status)
-    lot_status_ok = lot_status == "Within range"
+    lot_status_ok = lot_status == t("lot_within_range")
+
 
     lot_status_info = pd.DataFrame({
         'export_lot': lot_totals.index,
