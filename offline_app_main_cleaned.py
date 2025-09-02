@@ -266,24 +266,35 @@ def load_quota_view():
     result = supabase.table("quota_view").select("*").execute()
     df = pd.DataFrame(result.data)
 
-    if not df.empty:
-        # normalize headers to lowercase + strip
-        df.columns = df.columns.str.strip().str.lower()
+    # If no rows came back, return a typed empty frame so downstream code has columns.
+    if df.empty:
+        expected_cols = [
+            'farmer_id',
+            'max_quota_kg',
+            'total_net_weight_kg',
+            'quota_used_pct',
+            'quota_status'
+        ]
+        return pd.DataFrame(columns=expected_cols)
 
-        # tolerate common variants → all lowercase keys
-        if 'farmer_id' not in df.columns:
-            alias_map = {
-                'farmerid': 'farmer_id',
-                'farmer-id': 'farmer_id',
-                'farmer_id_': 'farmer_id',
-                'id_farmer': 'farmer_id',
-                'idfarmer': 'farmer_id',
-            }
-            for k, v in alias_map.items():
-                if k in df.columns:
-                    df = df.rename(columns={k: v})
-                    break
+    # normalize headers to lowercase + strip
+    df.columns = df.columns.str.strip().str.lower()
+
+    # tolerate common variants → all lowercase keys
+    if 'farmer_id' not in df.columns:
+        alias_map = {
+            'farmerid': 'farmer_id',
+            'farmer-id': 'farmer_id',
+            'farmer_id_': 'farmer_id',
+            'id_farmer': 'farmer_id',
+            'idfarmer': 'farmer_id',
+        }
+        for k, v in alias_map.items():
+            if k in df.columns:
+                df = df.rename(columns={k: v})
+                break
     return df
+
 
 
 # --- UI Layout ---
