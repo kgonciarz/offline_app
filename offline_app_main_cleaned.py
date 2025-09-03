@@ -60,10 +60,6 @@ def t(key):
             "English": "### Lot Status Overview - Out of Range",
             "Français": "### Aperçu des Lots - Hors Plage Autorisée"
         },
-        "rollback_error": {
-            "English": "❌ Uploaded delivery has been rolled back due to validation errors. PDF cannot be generated.",
-            "Français": "❌ Livraison annulée en raison d'erreurs de validation. PDF non généré."
-        },
         "file_approved": {
             "English": "✅ File approved. All farmers valid, quotas OK, and delivered kg per lot within allowed range.",
             "Français": "✅ Fichier approuvé. Tous les producteurs sont valides et les quotas respectés."
@@ -84,14 +80,14 @@ def t(key):
             "English": "Within range",
             "Français": "Dans la plage autorisée"
         },
-         "insert_success": {
-            "English": "✅ Data successfully inserted! {0} new records added.",
-            "Français": "✅ Données insérées avec succès ! {0} nouveaux enregistrements ajoutés."
+        "validation_complete": {
+            "English": "✅ Validation completed successfully!",
+            "Français": "✅ Validation terminée avec succès !"
         },
-
-
-
-        
+        "comparison_mode": {
+            "English": "📊 Comparison Mode - File validation only (no data saved)",
+            "Français": "📊 Mode Comparaison - Validation uniquement (aucune donnée sauvegardée)"
+        }
     }
     return translations.get(key, {}).get(lang, key)
 
@@ -125,69 +121,90 @@ def load_all_farmers():
     farmers_df['farmer_id'] = farmers_df['farmer_id'].astype(str).str.strip().str.lower()
     return farmers_df
 
-def delete_existing_delivery_rpc(export_lot, exporter_name, farmer_ids):
-    export_lot = str(export_lot)
-    exporter_name = str(exporter_name)
-    if hasattr(farmer_ids, 'tolist'):
-        farmer_ids = farmer_ids.tolist()
-    farmer_ids = [str(farmer_id) for farmer_id in farmer_ids]
-    try:
-        supabase.rpc('delete_traceability_records', {
-            'lot': export_lot,
-            'exporter_param': exporter_name,
-            'farmer_ids': farmer_ids
-        }).execute()
-    except Exception as e:
-        st.error(f"❌ RPC Delete Error: {e}")
-
-
-def save_delivery_to_supabase(df):
-    column_mapping = {
-        'cooperative name': 'cooperative_name',
-        'export lot n°/connaissement': 'export_lot',
-        'date of purchase from cooperative': 'purchase_date',
-        'certification': 'certification',
-        'farmer_id': 'farmer_id',
-        'net weight (kg)': 'net_weight_kg',
-        'exporter': 'exporter'
-    }
-    df = df.rename(columns=column_mapping)
-    required_columns = ['export_lot', 'exporter', 'farmer_id', 'net_weight_kg']
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        st.error(f"Missing required columns: {', '.join(missing_columns)}")
-        return False
-
-    df_cleaned = df.copy()
-    df_cleaned['farmer_id'] = df_cleaned['farmer_id'].str.strip().str.lower()
-    df_cleaned['purchase_date'] = df_cleaned['purchase_date'].fillna(datetime.today().strftime('%Y-%m-%d'))
-
-    def excel_date_to_date(excel_date):
-        if isinstance(excel_date, (int, float)):
-            return (pd.to_datetime('1899-12-30') + pd.to_timedelta(excel_date, unit='D')).strftime('%Y-%m-%d')
-        return excel_date
-
-    df_cleaned['purchase_date'] = df_cleaned['purchase_date'].apply(excel_date_to_date)
-    df_cleaned['purchase_date'] = df_cleaned['purchase_date'].astype(str)
-    data = df_cleaned.to_dict(orient="records")
-
-    try:
-        supabase.table("traceability").insert(data).execute()
-        st.success(t("insert_success").format(len(data)))
-        return True
-    except Exception as e:
-        st.error(t("insert_error").format(e))
-        return False
-def refresh_quota_view():
-    try:
-        supabase.rpc("refresh_quota_view").execute()
-        print("✅ quota_view successfully refreshed.")
-    except Exception as e:
-        print("❌ Failed to refresh quota_view:", e)
-
-refresh_quota_view()
-
-
+def simulate_quota_check(uploaded_df, farmers_df):
+    """
+    Simulate quota checking by calculating what the quotas would be 
+    if this delivery were added to existing deliveries
+    """
+    # Get current quota status from database
+    result = supabase.table("quota_view").select("*").execute()
+    current_quota_df = pd.DataFrame(result.data)
+    
+    if current_quota_df.empty:
+        # If no existing quota data, create basic structure
+        current_quota_df = pd.DataFrame({
+            'farmer_id': farmers_df['farmer_id'],
+            'max_quota_kg': QUOTA_PER_HA * 1000,  # Assuming 1 hectare per farmer as default
+            'total_net_weight_kg': 0,
+            'quota_used_pct': 0,
+            'quota_status': 'OK'
+        })
+    
+    # Normalize columns
+    current_quota_df.columns = current_quota_df.columns.str.strip().str.lower()
+    current_quota_df['farmer_id'] = current_quota_df['farmer_id'].astype(str).str.strip().str.lower()
+    
+    # Calculate additional weight from uploaded file
+    uploaded_weights = uploaded_df.groupby('farmer_id')['net_weight_kg'].sum().reset_index()
+    uploaded_weights['farmer_id'] = uploaded_weights['farmer_id'].astype(str).str.strip().str.lower()
+    
+    # Merge and calculate new totals
+    simulated_quota = current_quota_df.copy()
+    
+    for _, row in uploaded_weights.iterrows():
+        farmer_id = row['farmer_id']
+        additional_weight = row['net_weight_kg']
+        
+        # Find farmer in current quota data
+        farmer_idx = simulated_quota[simulated_quota['farmer_id'] == farmer_id].index
+        
+        if len(farmer_idx) > 0:
+            idx = farmer_idx[0]
+            current_weight = simulated_quota.loc[idx, 'total_net_weight_kg']
+            max_quota = simulated_quota.loc[idx, 'max_quota_kg']
+            
+            new_total = current_weight + additional_weight
+            new_percentage = (new_total / max_quota) * 100 if max_quota > 0 else 0
+            
+            # Update simulated values
+            simulated_quota.loc[idx, 'total_net_weight_kg'] = new_total
+            simulated_quota.loc[idx, 'quota_used_pct'] = new_percentage
+            
+            # Determine status
+            if new_percentage > 100:
+                simulated_quota.loc[idx, 'quota_status'] = 'EXCEEDED'
+            elif new_percentage > 90:
+                simulated_quota.loc[idx, 'quota_status'] = 'WARNING'
+            else:
+                simulated_quota.loc[idx, 'quota_status'] = 'OK'
+        else:
+            # Farmer not found in quota data - add them
+            # You might want to fetch max_quota from farmers table based on hectares
+            farmer_data = farmers_df[farmers_df['farmer_id'] == farmer_id]
+            if not farmer_data.empty:
+                # Assuming there's a hectares column, otherwise default to 1
+                hectares = farmer_data.iloc[0].get('hectares', 1)
+                max_quota = hectares * QUOTA_PER_HA
+                
+                new_percentage = (additional_weight / max_quota) * 100 if max_quota > 0 else 0
+                
+                if new_percentage > 100:
+                    status = 'EXCEEDED'
+                elif new_percentage > 90:
+                    status = 'WARNING'
+                else:
+                    status = 'OK'
+                
+                new_row = pd.DataFrame({
+                    'farmer_id': [farmer_id],
+                    'max_quota_kg': [max_quota],
+                    'total_net_weight_kg': [additional_weight],
+                    'quota_used_pct': [new_percentage],
+                    'quota_status': [status]
+                })
+                simulated_quota = pd.concat([simulated_quota, new_row], ignore_index=True)
+    
+    return simulated_quota
 
 def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg, lot_kg_summary, logo_path, logo_cocoa):
     from fpdf import FPDF
@@ -196,7 +213,7 @@ def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 14)
-    pdf.cell(200, 10, "Delivery Approval Certificate", ln=True, align="C")
+    pdf.cell(200, 10, "Delivery Validation Report", ln=True, align="C")
 
     if logo_path:
         pdf.image(logo_path, x=10, y=20, w=40)
@@ -211,6 +228,7 @@ def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg
     pdf.multi_cell(0, 10, f"Lots: {', '.join(str(l) for l in lot_numbers)}")
     pdf.multi_cell(0, 10, f"Total Farmers: {farmer_count}")
     pdf.multi_cell(0, 10, f"Total Net Weight: {round(total_kg / 1000, 2)} MT")
+    pdf.multi_cell(0, 10, f"Status: VALIDATION ONLY - NO DATA SAVED")
 
     pdf.ln(5)
     pdf.set_font("Arial", "B", 12)
@@ -220,22 +238,20 @@ def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg
         pdf.cell(0, 10, f"{lot}: {round(kg / 1000, 2)} MT", ln=True)
 
     pdf.ln(5)
-    pdf.cell(0, 10, "Approved by CloudIA", ln=True)
+    pdf.cell(0, 10, "Validated by CloudIA (Comparison Mode)", ln=True)
 
-    # Nazwa pliku
+    # Generate filename
     reference_number = str(lot_numbers[0]).replace("/", "_") if len(lot_numbers) == 1 else "MULTI"
     today_str = datetime.now().strftime('%Y%m%d')
     exporter_clean = exporter_name.replace(" ", "_").replace("/", "_")[:20]
     total_volume_mt = round(total_kg / 1000, 2)
-    filename = f"Approval_{reference_number}_{today_str}_{exporter_clean}_{total_volume_mt}MT.pdf"
+    filename = f"Validation_{reference_number}_{today_str}_{exporter_clean}_{total_volume_mt}MT.pdf"
 
-    # 🧠 Prawidłowy zapis do BytesIO:
     pdf_bytes = pdf.output(dest='S').encode('latin1')
     pdf_buffer = BytesIO(pdf_bytes)
     pdf_buffer.seek(0)
 
     return filename, pdf_buffer
-
 
 def upload_to_sharepoint(file_buffer, filename, sharepoint_config):
     try:
@@ -260,43 +276,6 @@ def upload_to_sharepoint(file_buffer, filename, sharepoint_config):
         st.error(f"❌ Upload failed. Error:\n\n{e}")
         return False
 
-
-
-def load_quota_view():
-    result = supabase.table("quota_view").select("*").execute()
-    df = pd.DataFrame(result.data)
-
-    # If no rows came back, return a typed empty frame so downstream code has columns.
-    if df.empty:
-        expected_cols = [
-            'farmer_id',
-            'max_quota_kg',
-            'total_net_weight_kg',
-            'quota_used_pct',
-            'quota_status'
-        ]
-        return pd.DataFrame(columns=expected_cols)
-
-    # normalize headers to lowercase + strip
-    df.columns = df.columns.str.strip().str.lower()
-
-    # tolerate common variants → all lowercase keys
-    if 'farmer_id' not in df.columns:
-        alias_map = {
-            'farmerid': 'farmer_id',
-            'farmer-id': 'farmer_id',
-            'farmer_id_': 'farmer_id',
-            'id_farmer': 'farmer_id',
-            'idfarmer': 'farmer_id',
-        }
-        for k, v in alias_map.items():
-            if k in df.columns:
-                df = df.rename(columns={k: v})
-                break
-    return df
-
-
-
 # --- UI Layout ---
 st.markdown("---")
 logo_col1, logo_col2 = st.columns([1, 1])
@@ -304,7 +283,6 @@ with logo_col1:
     st.image(Image.open(LOGO_PATH), width=120)
 with logo_col2:
     st.image(Image.open(LOGO_COCOA), width=200)
-
 
 st.markdown("""
     <div style='
@@ -322,9 +300,10 @@ st.markdown("""
 
 st.markdown(f"### {t('title')}")
 
+# Add comparison mode indicator
+st.info(t("comparison_mode"))
 
-
-# --- Główna logika ---
+# --- Main Logic ---
 st.subheader("📥 Step 1: Upload Excel for Validation")
 delivery_file = st.file_uploader(t("upload_title"), type=["xlsx"])
 farmers_df = load_all_farmers()
@@ -359,6 +338,7 @@ if delivery_file:
 
     uploaded_df = uploaded_df.drop_duplicates(subset=['export_lot', 'exporter', 'farmer_id', 'net_weight_kg'], keep='last')
 
+    # Check if farmers exist in database
     unknown_farmers = uploaded_df[
         ~uploaded_df['farmer_id'].str.lower().isin(farmers_df['farmer_id'].str.lower())
     ]['farmer_id'].unique()
@@ -368,32 +348,15 @@ if delivery_file:
         st.write(list(unknown_farmers))
         st.stop()
 
-    lot_numbers = uploaded_df['export_lot'].unique()
-    for lot in lot_numbers:
-        farmer_ids_for_lot = uploaded_df[uploaded_df['export_lot'] == lot]['farmer_id'].unique().tolist()
-        delete_existing_delivery_rpc(lot, exporter_name, farmer_ids_for_lot)
-
-# ... (wszystko przed tym zostaje bez zmian)
-
-    inserted_ok = save_delivery_to_supabase(uploaded_df)
-    if not inserted_ok:
-        st.stop()
-
-    time.sleep(1)  # daj czas na propagację danych
-    quota_df = load_quota_view()
-
-    # Diagnoza – sprawdź czy kolumna farmer_id istnieje
-    if 'farmer_id' not in quota_df.columns:
-        st.error(t("missing_farmer_id_column").format(list(quota_df.columns)))
-        st.stop()
-
-    # Czyszczenie i filtrowanie
+    # Simulate quota checking without saving data
+    simulated_quota_df = simulate_quota_check(uploaded_df, farmers_df)
+    
+    # Filter for uploaded farmers only
     uploaded_ids = pd.Series(uploaded_df['farmer_id']).astype(str).str.strip().str.lower()
-    quota_df['farmer_id'] = quota_df['farmer_id'].astype(str).str.strip().str.lower()
-    quota_df = quota_df[quota_df['farmer_id'].isin(uploaded_ids)]
-
-    quota_filtered = quota_df[quota_df['quota_status'].isin(['EXCEEDED', 'WARNING'])]
-
+    quota_filtered = simulated_quota_df[
+        (simulated_quota_df['farmer_id'].isin(uploaded_ids)) & 
+        (simulated_quota_df['quota_status'].isin(['EXCEEDED', 'WARNING']))
+    ]
 
     if not quota_filtered.empty:
         st.write(t("quota_overview_title"))
@@ -418,8 +381,7 @@ if delivery_file:
     else:
         st.success(t("quota_ok"))
 
-    all_ids_valid = len(unknown_farmers) == 0
-    any_quota_exceeded = 'EXCEEDED' in quota_filtered['quota_status'].values
+    # Check lot weights
     lot_totals = uploaded_df.groupby('export_lot')['net_weight_kg'].sum()
 
     def check_lot_status(weight_in_kg):
@@ -432,7 +394,6 @@ if delivery_file:
     lot_status = lot_totals.apply(check_lot_status)
     lot_status_ok = lot_status == t("lot_within_range")
 
-
     lot_status_info = pd.DataFrame({
         'export_lot': lot_totals.index,
         'total_net_weight_kg': lot_totals.values,
@@ -443,17 +404,16 @@ if delivery_file:
         st.write(t("lot_status_out_of_range"))
         st.dataframe(lot_status_info[~lot_status_ok])
 
-    def rollback_delivery(uploaded_df):
-        lot_numbers = uploaded_df['export_lot'].unique()
-        exporter_name = uploaded_df['exporter'].iloc[0]
-        for lot in lot_numbers:
-            farmer_ids_for_lot = uploaded_df[uploaded_df['export_lot'] == lot]['farmer_id'].unique().tolist()
-            delete_existing_delivery_rpc(lot, exporter_name, farmer_ids_for_lot)
-        st.error(t("rollback_error"))
+    # Final validation results
+    all_ids_valid = len(unknown_farmers) == 0
+    any_quota_exceeded = 'EXCEEDED' in quota_filtered['quota_status'].values if not quota_filtered.empty else False
 
     if all_ids_valid and not any_quota_exceeded and lot_status_ok.all():
         st.success(t("file_approved"))
+    else:
+        st.success(t("validation_complete"))
 
+    # PDF Generation
     if 'pdf_buffer' not in st.session_state:
         st.session_state['pdf_buffer'] = None
         st.session_state['pdf_filename'] = None
@@ -482,8 +442,6 @@ if delivery_file:
                 mime="application/pdf"
             )
 
-
-
     with col2:
         if st.button("📤 Upload to SharePoint"):
             success_pdf = success_excel = False
@@ -493,7 +451,7 @@ if delivery_file:
                 success_pdf = upload_to_sharepoint(
                     st.session_state['pdf_buffer'],
                     st.session_state['pdf_filename'],
-                    sharepoint_config  # ✅ dodane!
+                    sharepoint_config
                 )
 
                 st.info("📤 Uploading Excel to SharePoint...")
@@ -501,7 +459,7 @@ if delivery_file:
                 success_excel = upload_to_sharepoint(
                     delivery_file,
                     delivery_file.name,
-                    sharepoint_config  # ✅ dodane!
+                    sharepoint_config
                 )
 
                 if success_pdf and success_excel:
@@ -510,5 +468,3 @@ if delivery_file:
                     st.warning("⚠️ Not all files uploaded. See error above.")
             else:
                 st.warning("⚠️ Please generate the PDF first.")
-
-
