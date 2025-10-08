@@ -198,11 +198,35 @@ def simulate_quota_check(uploaded_df, farmers_df):
     add["net_weight_kg"] = pd.to_numeric(add["net_weight_kg"], errors="coerce").fillna(0)
 
     sim = base.merge(add, on="farmer_id", how="outer", suffixes=("", "_add"))
-    sim["total_net_weight_kg"] = sim["total_net_weight_kg"].fillna(0)
-    sim["net_weight_kg"] = sim["net_weight_kg"].fillna(0)
-    sim["authoritative_max_quota_kg"] = sim["authoritative_max_quota_kg"].fillna(0)
 
-    sim["new_total_kg"] = sim["total_net_weight_kg"] + sim["net_weight_kg"]
+    # keep clear names for clarity
+    sim["current_total_kg"] = pd.to_numeric(sim.get("total_net_weight_kg", 0), errors="coerce").fillna(0)
+    sim["uploaded_kg"]      = pd.to_numeric(sim.get("net_weight_kg", 0), errors="coerce").fillna(0)
+    sim["projected_total_kg"] = sim["current_total_kg"] + sim["uploaded_kg"]
+
+    maxq = pd.to_numeric(sim.get("authoritative_max_quota_kg", 0), errors="coerce").fillna(0)
+
+    # % and status (treat <=0 quota as missing)
+    sim["quota_used_pct"] = (100 * sim["projected_total_kg"] / maxq).where(maxq > 0, pd.NA)
+
+    sim["quota_status"] = "OK"
+    sim.loc[maxq <= 0, "quota_status"] = "MISSING_QUOTA"
+    sim.loc[(maxq > 0) & (sim["quota_used_pct"] > 100), "quota_status"] = "EXCEEDED"
+    sim.loc[(maxq > 0) & (sim["quota_used_pct"] > 90) & (sim["quota_used_pct"] <= 100), "quota_status"] = "WARNING"
+
+    # return only the canonical columns expected by your UI
+    out = sim[["farmer_id", "authoritative_max_quota_kg", "projected_total_kg", "quota_used_pct", "quota_status"]].copy()
+    out.rename(columns={
+        "authoritative_max_quota_kg": "max_quota_kg",
+        "projected_total_kg": "total_net_weight_kg",
+    }, inplace=True)
+
+    # Keep only farmers present in the uploaded file (your UI expectation)
+    uploaded_ids = uploaded_df["farmer_id"].astype(str).str.strip().str.lower().unique().tolist()
+    out = out[out["farmer_id"].isin(uploaded_ids)].copy()
+
+    #return out
+
 
     # 5) Compute % + status using authoritative max
     def pct(row):
