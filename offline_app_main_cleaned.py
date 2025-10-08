@@ -357,23 +357,25 @@ if delivery_file:
         st.stop()
 
     # Simulate quota checking without saving data
-    simulated_quota_df = simulate_quota_check_simple(uploaded_df, farmers_df)
+ # --- Simulate quota checking without saving data ---
+simulated_quota_df = simulate_quota_check_simple(uploaded_df, farmers_df)
 
-    
-    # Filter for uploaded farmers only
-    uploaded_ids = pd.Series(uploaded_df['farmer_id']).astype(str).str.strip().str.lower()
-    quota_filtered = simulated_quota_df[
-        (simulated_quota_df['farmer_id'].isin(uploaded_ids)) & 
-        (simulated_quota_df['quota_status'].isin(['EXCEEDED', 'WARNING']))
-    ]
+# Filter for uploaded farmers only
+uploaded_ids = uploaded_df['farmer_id'].astype(str).str.strip().str.lower()
+quota_filtered = simulated_quota_df[
+    (simulated_quota_df['farmer_id'].isin(uploaded_ids)) &
+    (simulated_quota_df['quota_status'].isin(['EXCEEDED', 'WARNING']))
+].copy()
 
+# ---- Quota table (single, clean block) ----
 if not quota_filtered.empty:
     st.write(t("quota_overview_title"))
 
-    dfv = quota_filtered[['farmer_id','max_quota_kg','total_net_weight_kg','quota_used_pct','quota_status']] \
+    dfv = quota_filtered[['farmer_id', 'max_quota_kg', 'total_net_weight_kg', 'quota_used_pct', 'quota_status']] \
         .reset_index(drop=True).copy()
 
-    for col in ['max_quota_kg','total_net_weight_kg','quota_used_pct']:
+    # ensure numeric for formatting
+    for col in ['max_quota_kg', 'total_net_weight_kg', 'quota_used_pct']:
         dfv[col] = pd.to_numeric(dfv[col], errors='coerce')
 
     def highlight_status_col(s: pd.Series):
@@ -402,62 +404,25 @@ if not quota_filtered.empty:
 else:
     st.success(t('quota_ok'))
 
+# ---- Lot checks (always run, independent of the table above) ----
+lot_totals = uploaded_df.groupby('export_lot')['net_weight_kg'].sum()
 
-    # Status highlighter
-    def highlight_status_col(s: pd.Series):
-        return [
-            'background-color: #ffcccc' if v == 'EXCEEDED'
-            else 'background-color: #fff3cd' if v == 'WARNING'
-            else ''
-            for v in s
-        ]
+def check_lot_status(weight_in_kg):
+    weight_in_mt = weight_in_kg / 1000
+    return t("lot_within_range") if weight_in_mt >= 21 else t("lot_too_low")
 
-    styled_quota = (
-        dfv.style
-           .apply(highlight_status_col, subset=['quota_status'])
-           .format({
-               'max_quota_kg': '{:.0f}',
-               'total_net_weight_kg': '{:.0f}',
-               'quota_used_pct': '{:.2f}',
-           })
-    )
+lot_status = lot_totals.apply(check_lot_status)
+lot_status_ok = lot_status == t("lot_within_range")
 
-    # Render with graceful fallback
-    try:
-        st.dataframe(styled_quota, use_container_width=True)
-    except Exception:
-        st.warning("Styling failed; showing plain table instead.")
-        st.dataframe(dfv, use_container_width=True)
+lot_status_info = pd.DataFrame({
+    'export_lot': lot_totals.index,
+    'total_net_weight_kg': lot_totals.values,
+    'lot_status': lot_status
+})
 
-    st.warning(t("quota_warning_count").format(len(quota_filtered)))
-
-else:
-    st.success(t("quota_ok"))
-
-
-
-    # Check lot weights
-    lot_totals = uploaded_df.groupby('export_lot')['net_weight_kg'].sum()
-
-    def check_lot_status(weight_in_kg):
-        weight_in_mt = weight_in_kg / 1000
-        if weight_in_mt < 21:
-            return t("lot_too_low")
-        else:
-            return t("lot_within_range")
-
-    lot_status = lot_totals.apply(check_lot_status)
-    lot_status_ok = lot_status == t("lot_within_range")
-
-    lot_status_info = pd.DataFrame({
-        'export_lot': lot_totals.index,
-        'total_net_weight_kg': lot_totals.values,
-        'lot_status': lot_status
-    })
-
-    if not lot_status_ok.all():
-        st.write(t("lot_status_out_of_range"))
-        st.dataframe(lot_status_info[~lot_status_ok])
+if not lot_status_ok.all():
+    st.write(t("lot_status_out_of_range"))
+    st.dataframe(lot_status_info[~lot_status_ok])
 
     # Final validation results
     all_ids_valid = len(unknown_farmers) == 0
