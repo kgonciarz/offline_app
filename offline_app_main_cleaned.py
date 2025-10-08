@@ -369,7 +369,7 @@ if delivery_file:
         'net weight (kg)': 'net_weight_kg',
         'date of purchase from cooperative': 'purchase_date'
     }, inplace=True)
-
+    uploaded_df["net_weight_kg"] = pd.to_numeric(uploaded_df["net_weight_kg"], errors="coerce").fillna(0)
     uploaded_df['purchase_date'] = uploaded_df['purchase_date'].fillna(datetime.today().strftime('%Y-%m-%d'))
     uploaded_df['exporter'] = exporter_name
 
