@@ -123,88 +123,118 @@ def load_all_farmers():
 
 def simulate_quota_check(uploaded_df, farmers_df):
     """
-    Simulate quota checking by calculating what the quotas would be 
-    if this delivery were added to existing deliveries
+    Simulate quota usage after adding the uploaded deliveries, using:
+      - max quota from FARMERS (authoritative)
+      - current delivered total from QUOTA_VIEW (if present)
     """
-    # Get current quota status from database
-    result = supabase.table("quota_view").select("*").execute()
-    current_quota_df = pd.DataFrame(result.data)
-    
-    if current_quota_df.empty:
-        # If no existing quota data, create basic structure
-        current_quota_df = pd.DataFrame({
-            'farmer_id': farmers_df['farmer_id'],
-            'max_quota_kg': QUOTA_PER_HA * 1000,  # Assuming 1 hectare per farmer as default
-            'total_net_weight_kg': 0,
-            'quota_used_pct': 0,
-            'quota_status': 'OK'
-        })
-    
-    # Normalize columns
-    current_quota_df.columns = current_quota_df.columns.str.strip().str.lower()
-    current_quota_df['farmer_id'] = current_quota_df['farmer_id'].astype(str).str.strip().str.lower()
-    
-    # Calculate additional weight from uploaded file
-    uploaded_weights = uploaded_df.groupby('farmer_id')['net_weight_kg'].sum().reset_index()
-    uploaded_weights['farmer_id'] = uploaded_weights['farmer_id'].astype(str).str.strip().str.lower()
-    
-    # Merge and calculate new totals
-    simulated_quota = current_quota_df.copy()
-    
-    for _, row in uploaded_weights.iterrows():
-        farmer_id = row['farmer_id']
-        additional_weight = row['net_weight_kg']
-        
-        # Find farmer in current quota data
-        farmer_idx = simulated_quota[simulated_quota['farmer_id'] == farmer_id].index
-        
-        if len(farmer_idx) > 0:
-            idx = farmer_idx[0]
-            current_weight = simulated_quota.loc[idx, 'total_net_weight_kg']
-            max_quota = simulated_quota.loc[idx, 'max_quota_kg']
-            
-            new_total = current_weight + additional_weight
-            new_percentage = (new_total / max_quota) * 100 if max_quota > 0 else 0
-            
-            # Update simulated values
-            simulated_quota.loc[idx, 'total_net_weight_kg'] = new_total
-            simulated_quota.loc[idx, 'quota_used_pct'] = new_percentage
-            
-            # Determine status
-            if new_percentage > 100:
-                simulated_quota.loc[idx, 'quota_status'] = 'EXCEEDED'
-            elif new_percentage > 90:
-                simulated_quota.loc[idx, 'quota_status'] = 'WARNING'
-            else:
-                simulated_quota.loc[idx, 'quota_status'] = 'OK'
-        else:
-            # Farmer not found in quota data - add them
-            # You might want to fetch max_quota from farmers table based on hectares
-            farmer_data = farmers_df[farmers_df['farmer_id'] == farmer_id]
-            if not farmer_data.empty:
-                # Assuming there's a hectares column, otherwise default to 1
-                hectares = farmer_data.iloc[0].get('hectares', 1)
-                max_quota = hectares * QUOTA_PER_HA
-                
-                new_percentage = (additional_weight / max_quota) * 100 if max_quota > 0 else 0
-                
-                if new_percentage > 100:
-                    status = 'EXCEEDED'
-                elif new_percentage > 90:
-                    status = 'WARNING'
-                else:
-                    status = 'OK'
-                
-                new_row = pd.DataFrame({
-                    'farmer_id': [farmer_id],
-                    'max_quota_kg': [max_quota],
-                    'total_net_weight_kg': [additional_weight],
-                    'quota_used_pct': [new_percentage],
-                    'quota_status': [status]
-                })
-                simulated_quota = pd.concat([simulated_quota, new_row], ignore_index=True)
-    
-    return simulated_quota
+
+    # (Optional but recommended) refresh the MV so totals aren't stale
+    try:
+        supabase.rpc("refresh_quota_view").execute()
+        # tiny pause helps if DB is busy
+        time.sleep(0.3)
+    except Exception:
+        pass  # non-fatal in comparison mode
+
+    # 1) Load current totals from quota_view
+    qv = supabase.table("quota_view").select("farmer_id,total_net_weight_kg").execute()
+    qv_df = pd.DataFrame(qv.data) if qv.data else pd.DataFrame(columns=["farmer_id","total_net_weight_kg"])
+    qv_df.columns = qv_df.columns.str.lower()
+    if not qv_df.empty:
+        qv_df["farmer_id"] = qv_df["farmer_id"].astype(str).str.strip().str.lower()
+        qv_df["total_net_weight_kg"] = pd.to_numeric(qv_df["total_net_weight_kg"], errors="coerce").fillna(0)
+    else:
+        qv_df = pd.DataFrame(columns=["farmer_id","total_net_weight_kg"])
+
+    # 2) Build authoritative max_quota_kg per farmer from FARMERS
+    # If your farmers_df already has these columns, reuse it; otherwise fetch a slim set:
+    # farmers_df = pd.DataFrame(supabase.table("farmers").select("farmer_id,max_quota_kg,hectares,area_ha").execute().data)
+    f = farmers_df.copy()
+    f.columns = f.columns.str.lower()
+    for c in ["farmer_id", "max_quota_kg", "hectares", "area_ha"]:
+        if c not in f.columns:
+            f[c] = None
+
+    # Normalize farmer_id
+    f["farmer_id"] = f["farmer_id"].astype(str).str.strip().str.lower()
+
+    # Clean textified quotas like "5,000" or "5 000"
+    def _clean_num(x):
+        if pd.isna(x):
+            return None
+        s = str(x).strip()
+        if s == "":
+            return None
+        s = s.replace(" ", "").replace(",", "")
+        try:
+            return float(s)
+        except Exception:
+            return None
+
+    f["max_quota_kg_clean"] = f["max_quota_kg"].apply(_clean_num)
+
+    # Pick area column
+    area_col = "hectares" if "hectares" in f.columns and f["hectares"].notna().any() else "area_ha"
+    f["area_val"] = pd.to_numeric(f[area_col], errors="coerce")
+
+    # Fill missing per-farmer max quota from area * QUOTA_PER_HA (kg/ha)
+    f["authoritative_max_quota_kg"] = f["max_quota_kg_clean"]
+    f.loc[f["authoritative_max_quota_kg"].isna(), "authoritative_max_quota_kg"] = (
+        f.loc[f["authoritative_max_quota_kg"].isna(), "area_val"].fillna(0) * QUOTA_PER_HA
+    )
+
+    # 3) Merge current totals with authoritative max
+    base = f[["farmer_id", "authoritative_max_quota_kg"]].merge(
+        qv_df[["farmer_id", "total_net_weight_kg"]],
+        on="farmer_id",
+        how="left"
+    )
+    base["total_net_weight_kg"] = pd.to_numeric(base["total_net_weight_kg"], errors="coerce").fillna(0)
+    base["authoritative_max_quota_kg"] = pd.to_numeric(base["authoritative_max_quota_kg"], errors="coerce").fillna(0)
+
+    # 4) Add the uploaded weights
+    add = uploaded_df.groupby("farmer_id", as_index=False)["net_weight_kg"].sum()
+    add["farmer_id"] = add["farmer_id"].astype(str).str.strip().str.lower()
+    add["net_weight_kg"] = pd.to_numeric(add["net_weight_kg"], errors="coerce").fillna(0)
+
+    sim = base.merge(add, on="farmer_id", how="outer", suffixes=("", "_add"))
+    sim["total_net_weight_kg"] = sim["total_net_weight_kg"].fillna(0)
+    sim["net_weight_kg"] = sim["net_weight_kg"].fillna(0)
+    sim["authoritative_max_quota_kg"] = sim["authoritative_max_quota_kg"].fillna(0)
+
+    sim["new_total_kg"] = sim["total_net_weight_kg"] + sim["net_weight_kg"]
+
+    # 5) Compute % + status using authoritative max
+    def pct(row):
+        denom = row["authoritative_max_quota_kg"]
+        return 0.0 if denom <= 0 else (row["new_total_kg"] / denom) * 100.0
+
+    sim["quota_used_pct"] = sim.apply(pct, axis=1)
+
+    def status(row):
+        p = row["quota_used_pct"]
+        if p > 100:
+            return "EXCEEDED"
+        elif p > 90:
+            return "WARNING"
+        return "OK"
+
+    sim["quota_status"] = sim.apply(status, axis=1)
+
+    # 6) Return in your expected columns
+    sim.rename(columns={
+        "authoritative_max_quota_kg": "max_quota_kg",
+        "new_total_kg": "total_net_weight_kg"
+    }, inplace=True)
+
+    # Keep only farmers present in the uploaded file (your UI expectation)
+    uploaded_ids = uploaded_df["farmer_id"].astype(str).str.strip().str.lower().unique().tolist()
+    sim = sim[sim["farmer_id"].isin(uploaded_ids)].copy()
+
+    # Order / formatting
+    sim = sim[["farmer_id", "max_quota_kg", "total_net_weight_kg", "quota_used_pct", "quota_status"]]
+    return sim
+
 
 def generate_pdf_confirmation(lot_numbers, exporter_name, farmer_count, total_kg, lot_kg_summary, logo_path, logo_cocoa):
     from fpdf import FPDF
