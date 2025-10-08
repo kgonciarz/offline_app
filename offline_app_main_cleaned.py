@@ -336,6 +336,13 @@ st.info(t("comparison_mode"))
 # --- Main Logic ---
 st.subheader("📥 Step 1: Upload Excel for Validation")
 delivery_file = st.file_uploader(t("upload_title"), type=["xlsx"])
+
+# ✅ Stop everything until a file is uploaded
+if delivery_file is None:
+    st.caption(t("file_format_caption"))
+    st.info("📥 Upload an Excel (.xlsx) to start the validation.")
+    st.stop()
+
 farmers_df = load_all_farmers()
 
 if delivery_file:
