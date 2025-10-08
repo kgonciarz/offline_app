@@ -391,17 +391,23 @@ if delivery_file:
 if not quota_filtered.empty:
     st.write(t("quota_overview_title"))
 
-    # keep only the columns you want and reset index to avoid alignment issues
+    # Build the view table
     dfv = quota_filtered[[
         'farmer_id', 'max_quota_kg', 'total_net_weight_kg', 'quota_used_pct', 'quota_status'
     ]].reset_index(drop=True).copy()
 
-    # make sure numeric cols are numeric (formatting otherwise can choke)
+    # 🔧 Deduplicate any repeated columns (keep first occurrence)
+    dup_mask = dfv.columns.duplicated(keep='first')
+    if dup_mask.any():
+        st.warning(f"Duplicate columns found in quota table: {list(dfv.columns[dup_mask])}. Keeping the first.")
+        dfv = dfv.loc[:, ~dup_mask]
+
+    # Ensure numeric cols are numeric
     for col in ['max_quota_kg', 'total_net_weight_kg', 'quota_used_pct']:
         if col in dfv.columns:
             dfv[col] = pd.to_numeric(dfv[col], errors='coerce')
 
-    # robust column-highlighter for a single column
+    # Status highlighter
     def highlight_status_col(s: pd.Series):
         return [
             'background-color: #ffcccc' if v == 'EXCEEDED'
@@ -412,7 +418,7 @@ if not quota_filtered.empty:
 
     styled_quota = (
         dfv.style
-           .apply(highlight_status_col, subset=['quota_status'])  # <- use apply, not applymap
+           .apply(highlight_status_col, subset=['quota_status'])
            .format({
                'max_quota_kg': '{:.0f}',
                'total_net_weight_kg': '{:.0f}',
@@ -420,18 +426,18 @@ if not quota_filtered.empty:
            })
     )
 
-    # render; if styling fails for any reason, fall back gracefully
+    # Render with graceful fallback
     try:
         st.dataframe(styled_quota, use_container_width=True)
     except Exception:
-        st.warning("Styling failed on this environment; showing plain table instead.")
+        st.warning("Styling failed; showing plain table instead.")
         st.dataframe(dfv, use_container_width=True)
 
-    # <-- this should NOT be inside the except; it should always run
     st.warning(t("quota_warning_count").format(len(quota_filtered)))
 
 else:
     st.success(t("quota_ok"))
+
 
 
     # Check lot weights
