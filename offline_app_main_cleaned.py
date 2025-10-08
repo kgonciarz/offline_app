@@ -405,6 +405,7 @@ else:
     st.success(t('quota_ok'))
 
 # ---- Lot checks (always run, independent of the table above) ----
+# ---- Lot checks (always run, independent of the table above) ----
 lot_totals = uploaded_df.groupby('export_lot')['net_weight_kg'].sum()
 
 def check_lot_status(weight_in_kg):
@@ -424,67 +425,69 @@ if not lot_status_ok.all():
     st.write(t("lot_status_out_of_range"))
     st.dataframe(lot_status_info[~lot_status_ok])
 
-    # Final validation results
-    all_ids_valid = len(unknown_farmers) == 0
-    any_quota_exceeded = 'EXCEEDED' in quota_filtered['quota_status'].values if not quota_filtered.empty else False
+# ---- Final validation results (dedented so it always runs) ----
+all_ids_valid = len(unknown_farmers) == 0
+any_quota_exceeded = (not quota_filtered.empty) and (
+    'EXCEEDED' in quota_filtered['quota_status'].values
+)
 
-    if all_ids_valid and not any_quota_exceeded and lot_status_ok.all():
-        st.success(t("file_approved"))
-    else:
-        st.success(t("validation_complete"))
+if all_ids_valid and not any_quota_exceeded and lot_status_ok.all():
+    st.success(t("file_approved"))
+else:
+    st.success(t("validation_complete"))
 
-    # PDF Generation
-    if 'pdf_buffer' not in st.session_state:
-        st.session_state['pdf_buffer'] = None
-        st.session_state['pdf_filename'] = None
+# ---- PDF + SharePoint buttons (dedented so they always show) ----
+if 'pdf_buffer' not in st.session_state:
+    st.session_state['pdf_buffer'] = None
+    st.session_state['pdf_filename'] = None
 
-    col1, col2 = st.columns([1, 1])
+col1, col2 = st.columns([1, 1])
 
-    with col1:
-        if st.button(t("generate_pdf")):
-            total_kg = int(lot_totals.sum())
-            filename, pdf_buffer = generate_pdf_confirmation(
-                lot_numbers=lot_totals.index.tolist(),
-                exporter_name=exporter_name,
-                farmer_count=uploaded_df['farmer_id'].nunique(),
-                total_kg=total_kg,
-                lot_kg_summary=lot_totals.to_dict(),
-                logo_path=LOGO_PATH,
-                logo_cocoa=LOGO_COCOA
+with col1:
+    if st.button(t("generate_pdf")):
+        total_kg = int(lot_totals.sum())
+        filename, pdf_buffer = generate_pdf_confirmation(
+            lot_numbers=lot_totals.index.tolist(),
+            exporter_name=exporter_name,
+            farmer_count=uploaded_df['farmer_id'].nunique(),
+            total_kg=total_kg,
+            lot_kg_summary=lot_totals.to_dict(),
+            logo_path=LOGO_PATH,
+            logo_cocoa=LOGO_COCOA
+        )
+        st.session_state['pdf_buffer'] = pdf_buffer
+        st.session_state['pdf_filename'] = filename
+
+        st.download_button(
+            label=t("download_pdf"),
+            data=pdf_buffer,
+            file_name=filename,
+            mime="application/pdf"
+        )
+
+with col2:
+    if st.button("📤 Upload to SharePoint"):
+        success_pdf = success_excel = False
+
+        if st.session_state['pdf_buffer'] and st.session_state['pdf_filename']:
+            st.info("📤 Uploading PDF to SharePoint...")
+            success_pdf = upload_to_sharepoint(
+                st.session_state['pdf_buffer'],
+                st.session_state['pdf_filename'],
+                sharepoint_config
             )
-            st.session_state['pdf_buffer'] = pdf_buffer
-            st.session_state['pdf_filename'] = filename
 
-            st.download_button(
-                label=t("download_pdf"),
-                data=pdf_buffer,
-                file_name=filename,
-                mime="application/pdf"
+            st.info("📤 Uploading Excel to SharePoint...")
+            delivery_file.seek(0)
+            success_excel = upload_to_sharepoint(
+                delivery_file,
+                delivery_file.name,
+                sharepoint_config
             )
 
-    with col2:
-        if st.button("📤 Upload to SharePoint"):
-            success_pdf = success_excel = False
-
-            if st.session_state['pdf_buffer'] and st.session_state['pdf_filename']:
-                st.info("📤 Uploading PDF to SharePoint...")
-                success_pdf = upload_to_sharepoint(
-                    st.session_state['pdf_buffer'],
-                    st.session_state['pdf_filename'],
-                    sharepoint_config
-                )
-
-                st.info("📤 Uploading Excel to SharePoint...")
-                delivery_file.seek(0)
-                success_excel = upload_to_sharepoint(
-                    delivery_file,
-                    delivery_file.name,
-                    sharepoint_config
-                )
-
-                if success_pdf and success_excel:
-                    st.success("✅ Both PDF and Excel uploaded to SharePoint.")
-                else:
-                    st.warning("⚠️ Not all files uploaded. See error above.")
+            if success_pdf and success_excel:
+                st.success("✅ Both PDF and Excel uploaded to SharePoint.")
             else:
-                st.warning("⚠️ Please generate the PDF first.")
+                st.warning("⚠️ Not all files uploaded. See error above.")
+        else:
+            st.warning("⚠️ Please generate the PDF first.")
