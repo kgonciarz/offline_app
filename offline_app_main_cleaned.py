@@ -388,28 +388,51 @@ if delivery_file:
         (simulated_quota_df['quota_status'].isin(['EXCEEDED', 'WARNING']))
     ]
 
-    if not quota_filtered.empty:
-        st.write(t("quota_overview_title"))
+if not quota_filtered.empty:
+    st.write(t("quota_overview_title"))
 
-        def highlight_status(val):
-            if val == 'EXCEEDED':
-                return 'background-color: #ffcccc'
-            elif val == 'WARNING':
-                return 'background-color: #fff3cd'
-            return ''
+    # keep only the columns you want and reset index to avoid alignment issues
+    dfv = quota_filtered[[
+        'farmer_id', 'max_quota_kg', 'total_net_weight_kg', 'quota_used_pct', 'quota_status'
+    ]].reset_index(drop=True).copy()
 
-        styled_quota = quota_filtered[[
-            'farmer_id', 'max_quota_kg', 'total_net_weight_kg', 'quota_used_pct', 'quota_status'
-        ]].style.applymap(highlight_status, subset=['quota_status']).format({
-            'max_quota_kg': '{:.0f}',
-            'total_net_weight_kg': '{:.0f}',
-            'quota_used_pct': '{:.2f}'
-        })
+    # make sure numeric cols are numeric (formatting otherwise can choke)
+    for col in ['max_quota_kg', 'total_net_weight_kg', 'quota_used_pct']:
+        if col in dfv.columns:
+            dfv[col] = pd.to_numeric(dfv[col], errors='coerce')
 
+    # robust column-highlighter for a single column
+    def highlight_status_col(s: pd.Series):
+        return [
+            'background-color: #ffcccc' if v == 'EXCEEDED'
+            else 'background-color: #fff3cd' if v == 'WARNING'
+            else ''
+            for v in s
+        ]
+
+    styled_quota = (
+        dfv.style
+           .apply(highlight_status_col, subset=['quota_status'])  # <- use apply, not applymap
+           .format({
+               'max_quota_kg': '{:.0f}',
+               'total_net_weight_kg': '{:.0f}',
+               'quota_used_pct': '{:.2f}',
+           })
+    )
+
+    # render; if styling fails for any reason, fall back gracefully
+    try:
         st.dataframe(styled_quota, use_container_width=True)
-        st.warning(t("quota_warning_count").format(len(quota_filtered)))
-    else:
-        st.success(t("quota_ok"))
+    except Exception:
+        st.warning("Styling failed on this environment; showing plain table instead.")
+        st.dataframe(dfv, use_container_width=True)
+
+    # <-- this should NOT be inside the except; it should always run
+    st.warning(t("quota_warning_count").format(len(quota_filtered)))
+
+else:
+    st.success(t("quota_ok"))
+
 
     # Check lot weights
     lot_totals = uploaded_df.groupby('export_lot')['net_weight_kg'].sum()
