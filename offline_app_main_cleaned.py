@@ -357,7 +357,8 @@ if delivery_file:
         st.stop()
 
     # Simulate quota checking without saving data
-    simulated_quota_df = simulate_quota_check(uploaded_df, farmers_df)
+    simulated_quota_df = simulate_quota_check_simple(uploaded_df, farmers_df)
+
     
     # Filter for uploaded farmers only
     uploaded_ids = pd.Series(uploaded_df['farmer_id']).astype(str).str.strip().str.lower()
