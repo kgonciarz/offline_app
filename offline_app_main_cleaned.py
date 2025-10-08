@@ -369,21 +369,38 @@ if delivery_file:
 if not quota_filtered.empty:
     st.write(t("quota_overview_title"))
 
-    # Build the view table
-    dfv = quota_filtered[[
-        'farmer_id', 'max_quota_kg', 'total_net_weight_kg', 'quota_used_pct', 'quota_status'
-    ]].reset_index(drop=True).copy()
+    dfv = quota_filtered[['farmer_id','max_quota_kg','total_net_weight_kg','quota_used_pct','quota_status']] \
+        .reset_index(drop=True).copy()
 
-    # 🔧 Deduplicate any repeated columns (keep first occurrence)
-    dup_mask = dfv.columns.duplicated(keep='first')
-    if dup_mask.any():
-        st.warning(f"Duplicate columns found in quota table: {list(dfv.columns[dup_mask])}. Keeping the first.")
-        dfv = dfv.loc[:, ~dup_mask]
+    for col in ['max_quota_kg','total_net_weight_kg','quota_used_pct']:
+        dfv[col] = pd.to_numeric(dfv[col], errors='coerce')
 
-    # Ensure numeric cols are numeric
-    for col in ['max_quota_kg', 'total_net_weight_kg', 'quota_used_pct']:
-        if col in dfv.columns:
-            dfv[col] = pd.to_numeric(dfv[col], errors='coerce')
+    def highlight_status_col(s: pd.Series):
+        return [
+            'background-color: #ffcccc' if v == 'EXCEEDED'
+            else 'background-color: #fff3cd' if v == 'WARNING'
+            else ''
+            for v in s
+        ]
+
+    try:
+        styled = (
+            dfv.style
+               .apply(highlight_status_col, subset=['quota_status'])
+               .format({
+                   'max_quota_kg': '{:.0f}',
+                   'total_net_weight_kg': '{:.0f}',
+                   'quota_used_pct': '{:.2f}',
+               })
+        )
+        st.dataframe(styled, use_container_width=True)
+    except Exception:
+        st.dataframe(dfv, use_container_width=True)
+
+    st.warning(t('quota_warning_count').format(len(quota_filtered)))
+else:
+    st.success(t('quota_ok'))
+
 
     # Status highlighter
     def highlight_status_col(s: pd.Series):
