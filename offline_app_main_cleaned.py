@@ -121,6 +121,36 @@ def load_all_farmers():
     farmers_df['farmer_id'] = farmers_df['farmer_id'].astype(str).str.strip().str.lower()
     return farmers_df
 
+@st.cache_data
+def load_quota_view_all():
+    """Pobiera WSZYSTKIE wiersze z quota_view z paginacją po farmer_id."""
+    all_rows = []
+    page_size = 1000
+    last_farmer_id = None
+
+    while True:
+        q = (supabase.table("quota_view")
+                     .select("farmer_id,total_net_weight_kg")
+                     .order("farmer_id")
+                     .limit(page_size))
+        if last_farmer_id:
+            q = q.gt("farmer_id", last_farmer_id)
+        res = q.execute()
+        rows = res.data or []
+        if not rows:
+            break
+        all_rows.extend(rows)
+        last_farmer_id = rows[-1]["farmer_id"]
+
+    df = pd.DataFrame(all_rows)
+    if df.empty:
+        return pd.DataFrame(columns=["farmer_id", "total_net_weight_kg"])
+
+    df.columns = df.columns.str.lower()
+    df["farmer_id"] = df["farmer_id"].astype(str).str.strip().str.lower()
+    df["total_net_weight_kg"] = pd.to_numeric(df["total_net_weight_kg"], errors="coerce").fillna(0)
+    return df
+
 def simulate_quota_check_simple(uploaded_df: pd.DataFrame, farmers_df: pd.DataFrame) -> pd.DataFrame:
     """
     Read-only simulation of quota usage for ALL rows in the uploaded file.
@@ -130,17 +160,8 @@ def simulate_quota_check_simple(uploaded_df: pd.DataFrame, farmers_df: pd.DataFr
     Returns: farmer_id, max_quota_kg, total_net_weight_kg, quota_used_pct, quota_status
     """
     # Current totals from quota_view (read-only)
-    try:
-        qv = supabase.table("quota_view").select("farmer_id,total_net_weight_kg").execute()
-        qv_df = pd.DataFrame(qv.data or [])
-    except Exception:
-        qv_df = pd.DataFrame()
-    if qv_df.empty:
-        qv_df = pd.DataFrame(columns=["farmer_id", "total_net_weight_kg"])
-    qv_df.columns = qv_df.columns.str.lower()
-    if not qv_df.empty:
-        qv_df["farmer_id"] = qv_df["farmer_id"].astype(str).str.strip().str.lower()
-        qv_df["total_net_weight_kg"] = pd.to_numeric(qv_df["total_net_weight_kg"], errors="coerce").fillna(0)
+        # Current totals from quota_view (read-only, z pełną paginacją)
+    qv_df = load_quota_view_all()
 
     # Authoritative max quota from farmers
     f = farmers_df.copy()
